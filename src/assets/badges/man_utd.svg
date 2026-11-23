@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <path d="M32 4L56 13v20c0 14-10 23-24 27C18 56 8 47 8 33V13L32 4z" fill="#DA291C" stroke="#FBE122" stroke-width="3"/>
+  <circle cx="32" cy="27" r="10" fill="#FBE122"/>
+  <path d="M26 27l6-7 6 7-6 7z" fill="#DA291C"/>
+  <text x="32" y="51" text-anchor="middle" font-family="Georgia,serif" font-size="10" font-weight="bold" fill="#FBE122">MUN</text>
+</svg>
