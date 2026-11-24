@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import net from 'node:net';
+import os from 'node:os';
 import path from 'node:path';
 import mysql from 'mysql2/promise';
 import pg from 'pg';
@@ -112,7 +113,9 @@ export interface CpanelUapiTestResult {
   message: string;
 }
 
-const DATA_DIR = path.resolve(process.cwd(), 'data');
+const DATA_DIR = process.env.VERCEL
+  ? path.join(os.tmpdir(), 'casinoroyale-data')
+  : path.resolve(process.cwd(), 'data');
 const LOCAL_DB_FILE = path.resolve(DATA_DIR, 'casinoroyale-db.json');
 
 function ensureConfinedPath(targetPath: string, baseDir: string): string {
