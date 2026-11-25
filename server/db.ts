@@ -1241,6 +1241,7 @@ export async function initServerDatabase(): Promise<PersistedServerState> {
 
   if (cfg.driver === 'mysql') {
     try {
+      const useSsl = /^(1|true|yes)$/i.test((process.env.DB_SSL || '').trim());
       mysqlPool = cfg.connectionUrl
         ? mysql.createPool(cfg.connectionUrl)
         : mysql.createPool({
@@ -1250,7 +1251,9 @@ export async function initServerDatabase(): Promise<PersistedServerState> {
             password: cfg.password,
             database: cfg.database,
             waitForConnections: true,
-            connectionLimit: 10,
+            connectionLimit: process.env.VERCEL ? 3 : 10,
+            connectTimeout: 8000,
+            ...(useSsl ? { ssl: { rejectUnauthorized: false } } : {}),
           });
       await ensureMysqlSchema(mysqlPool);
       const [rows] = await mysqlPool.query(

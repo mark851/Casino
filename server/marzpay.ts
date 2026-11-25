@@ -149,6 +149,21 @@ function sanitizeUuid(raw: string): string {
   return clean;
 }
 
+async function detectOutboundIp(): Promise<string | null> {
+  try {
+    const res = await fetch('https://api.ipify.org?format=json', {
+      signal: AbortSignal.timeout(3000),
+      headers: { Accept: 'application/json' },
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { ip?: unknown };
+    const ip = typeof data?.ip === 'string' ? data.ip.trim() : '';
+    return ip && net.isIP(ip) ? ip : null;
+  } catch {
+    return null;
+  }
+}
+
 async function marzpayRequest(
   method: 'GET' | 'POST',
   endpointPath: string,
@@ -185,10 +200,18 @@ async function marzpayRequest(
   }
 
   if (!res.ok) {
-    const errMsg =
+    let errMsg =
       (typeof parsed.message === 'string' && parsed.message) ||
       (typeof parsed.error === 'string' && parsed.error) ||
       `MarzPay API returned HTTP ${res.status}.`;
+    if (/not whitelisted|ip whitelist/i.test(errMsg)) {
+      const reportedIp =
+        (typeof parsed.ip === 'string' && net.isIP(parsed.ip.trim()) ? parsed.ip.trim() : null) ||
+        (await detectOutboundIp());
+      if (reportedIp) {
+        errMsg = `${errMsg} (Server outbound IP: ${reportedIp})`;
+      }
+    }
     throw new Error(errMsg);
   }
 

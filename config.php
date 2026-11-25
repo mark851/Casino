@@ -89,10 +89,13 @@ if (!function_exists('cr_load_php_secrets_file')) {
 }
 
 // 1. Optional secrets file placed one directory above public_html in cPanel (non-web-accessible)
+cr_load_php_secrets_file(dirname(__DIR__) . '/casinoug-secrets.php');
 cr_load_php_secrets_file(dirname(__DIR__) . '/casinoroyale-secrets.php');
 cr_load_php_secrets_file(dirname(__DIR__) . '/secrets.php');
 cr_load_env_file(dirname(__DIR__) . '/.env');
-// 2. Fallback to secrets.php or .env inside the app directory (blocked from HTTP via .htaccess)
+// 2. Fallback to secrets files or .env inside the app directory (blocked from HTTP via .htaccess)
+cr_load_php_secrets_file(__DIR__ . '/casinoug-secrets.php');
+cr_load_php_secrets_file(__DIR__ . '/casinoroyale-secrets.php');
 cr_load_php_secrets_file(__DIR__ . '/secrets.php');
 cr_load_env_file(__DIR__ . '/.env');
 

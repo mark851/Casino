@@ -100,6 +100,32 @@ function cr_marzpay_safe_callback_url(): ?string
     return "https://{$host}/api.php?action=marzpay-webhook";
 }
 
+function cr_marzpay_detect_outbound_ip(): ?string
+{
+    if (!function_exists('curl_init')) {
+        return null;
+    }
+    $ch = curl_init('https://api.ipify.org?format=json');
+    if ($ch === false) {
+        return null;
+    }
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 3,
+        CURLOPT_CONNECTTIMEOUT => 2,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_SSL_VERIFYHOST => 2,
+    ]);
+    $raw = curl_exec($ch);
+    curl_close($ch);
+    if (!is_string($raw) || $raw === '') {
+        return null;
+    }
+    $decoded = json_decode($raw, true);
+    $ip = is_array($decoded) && is_string($decoded['ip'] ?? null) ? trim($decoded['ip']) : '';
+    return ($ip !== '' && filter_var($ip, FILTER_VALIDATE_IP)) ? $ip : null;
+}
+
 /**
  * @param array<string, mixed>|null $payload
  * @return array<string, mixed>
@@ -164,6 +190,14 @@ function cr_marzpay_request(string $method, string $endpointPath, ?array $payloa
 
     if ($httpCode < 200 || $httpCode >= 300) {
         $errMsg = (string) ($decoded['message'] ?? $decoded['error'] ?? "MarzPay API returned HTTP {$httpCode}.");
+        if (preg_match('/not whitelisted|ip whitelist/i', $errMsg)) {
+            $reportedIp = is_string($decoded['ip'] ?? null) && filter_var(trim($decoded['ip']), FILTER_VALIDATE_IP)
+                ? trim($decoded['ip'])
+                : cr_marzpay_detect_outbound_ip();
+            if ($reportedIp !== null) {
+                $errMsg .= " (Server outbound IP: {$reportedIp})";
+            }
+        }
         throw new RuntimeException($errMsg);
     }
 

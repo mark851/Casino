@@ -7,5 +7,6 @@ coverage/
 !.env.example
 secrets.php
 casinoroyale-secrets.php
+casinoug-secrets.php
 data/
 fc

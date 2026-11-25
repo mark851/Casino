@@ -7,7 +7,7 @@ Options -Indexes
 </IfModule>
 
 # Option: Set MarzPay & DB credentials directly via Apache SetEnv (No Node.js required)
-# Replace placeholders in cPanel File Manager -> Edit .htaccess, or use ../casinoroyale-secrets.php / secrets.php
+# Replace placeholders in cPanel File Manager -> Edit .htaccess, or use ../casinoug-secrets.php / ../casinoroyale-secrets.php
 # SetEnv DB_DRIVER "mysql"
 # SetEnv DB_HOST "localhost"
 # SetEnv DB_NAME ""
@@ -20,7 +20,7 @@ Options -Indexes
 # SetEnv MARZPAY_COUNTRY "UG"
 
 # Block public HTTP access to .env, SQL dumps, server sources, and internal PHP includes
-<FilesMatch "^(\.env(\..*)?|.*\.sql|.*\.md|config\.php|connection\.php|database\.php|db\.php|marzpay\.php|secrets\.php|casinoroyale-secrets\.php|package\.json|package-lock\.json|bun\.lock)$">
+<FilesMatch "^(\.env(\..*)?|.*\.sql|.*\.md|config\.php|connection\.php|database\.php|db\.php|marzpay\.php|secrets\.php|.*-secrets\.php|package\.json|package-lock\.json|bun\.lock)$">
   <IfModule mod_authz_core.c>
     Require all denied
   </IfModule>
