@@ -34,7 +34,7 @@ import {
 } from '../../shared/aiPersonas';
 import type { RoomChatMessage } from '../../shared/chatPresets';
 import type { PublicRoomSummary } from '../../shared/types';
-import { writeAdminLog } from './AdminHelpers';
+import { writeAdminLog } from '../adminHelpers';
 
 interface AdminRoomSummary extends PublicRoomSummary {
   aiSeats?: Array<{ uid: string; displayName: string; gender?: AiGender }>;

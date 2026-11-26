@@ -34,7 +34,7 @@ import {
 } from '../../lib/walletService';
 import { AdminLayout } from '../components/AdminLayout';
 import { timestampMs } from '../../utils/validation';
-import { writeAdminLog } from './AdminHelpers';
+import { writeAdminLog } from '../adminHelpers';
 import type {
   AdminLogRecord,
   AdministratorRecord,

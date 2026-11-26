@@ -22,7 +22,7 @@ import {
 import { extractWalletErrorMessage } from '../../lib/walletService';
 import { AdminLayout } from '../components/AdminLayout';
 import { timestampMs } from '../../utils/validation';
-import { writeAdminLog } from './AdminHelpers';
+import { writeAdminLog } from '../adminHelpers';
 import type { TransactionRecord, UserRecord, WalletRecord } from '../../shared/types';
 
 type PlayerFilter = 'all' | 'approved' | 'pending_kyc' | 'depositors' | 'suspended';

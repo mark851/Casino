@@ -10,7 +10,7 @@ import {
   type ServerAdminOverview,
 } from '../../lib/localStore';
 import { AdminLayout } from '../components/AdminLayout';
-import { createPlayerNotification, writeAdminLog } from './AdminHelpers';
+import { createPlayerNotification, writeAdminLog } from '../adminHelpers';
 import type { IdentityVerificationRecord, KycStatus } from '../../shared/types';
 
 export const AdminVerificationsPage: React.FC = () => {

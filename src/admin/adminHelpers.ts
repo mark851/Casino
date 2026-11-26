@@ -1,5 +1,5 @@
-import { getStore, notifyStore, pushNotification } from '../../lib/localStore';
-import type { AdminLogRecord } from '../../shared/types';
+import { getStore, notifyStore, pushNotification } from '../lib/localStore';
+import type { AdminLogRecord } from '../shared/types';
 
 export async function writeAdminLog(params: {
   adminUid: string;

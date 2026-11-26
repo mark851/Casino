@@ -35,7 +35,7 @@ import { PlayLobbyPage } from './pages/PlayLobbyPage';
 import { TournamentsPage } from './pages/TournamentsPage';
 import { GameTablePage } from './pages/GameTablePage';
 import { FriendsPage } from './pages/FriendsPage';
-import { AdminRoutes } from './admin/AdminApp';
+import { AdminRoutes } from './admin';
 
 const WithPublicLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <PublicLayout>{children}</PublicLayout>

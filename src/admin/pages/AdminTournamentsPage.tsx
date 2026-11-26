@@ -10,7 +10,7 @@ import {
   recordMatchResultAndAdvance,
 } from '../../lib/tournamentService';
 import { getKampalaDateString } from '../../shared/tournamentEngine';
-import { writeAdminLog } from './AdminHelpers';
+import { writeAdminLog } from '../adminHelpers';
 import type {
   TableGameType,
   TournamentEntryRecord,

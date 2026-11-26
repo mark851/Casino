@@ -5,7 +5,7 @@
 
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from '../lib/authContext';
-import { RequireAdminAuth } from '../components/RouteGuards';
+import { RequireAdminAuth } from './components/RequireAdminAuth';
 import { AdminLoginPage } from './pages/AdminLoginPage';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
 import { AdminVerificationsPage } from './pages/AdminVerificationsPage';
