@@ -1,9 +1,11 @@
 import React, { useRef } from 'react';
-import { Crown, RotateCcw, RotateCw, Sparkles } from 'lucide-react';
-import { PlayingCard } from './PlayingCard';
+import { Crown, RotateCcw, RotateCw, Sparkles, Zap } from 'lucide-react';
+import { PlayingCard, type CardDeckVariant } from './PlayingCard';
 import { ThreeMatatuTable } from './three/ThreeMatatuTable';
 import { useGameFullscreen } from '../hooks/useGameFullscreen';
 import { SUIT_LABELS, SUIT_SYMBOLS } from '../shared/matatuRules';
+import tileMatatuRoyaleImg from '../assets/images/tile_matatu_royale_1794598741250.jpg';
+import tileMatatuBlitzImg from '../assets/images/tile_matatu_blitz_1794598742191.jpg';
 import type { PlayingCard as PlayingCardType, SanitizedGameState } from '../shared/types';
 
 interface MatatuTableViewProps {
@@ -12,6 +14,7 @@ interface MatatuTableViewProps {
   isYourTurn: boolean;
   isHost: boolean;
   stakeLocked?: boolean;
+  variant?: CardDeckVariant;
   playableCardIds: Set<string>;
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
@@ -128,6 +131,7 @@ export const MatatuTableView: React.FC<MatatuTableViewProps> = ({
   isYourTurn,
   isHost,
   stakeLocked = false,
+  variant,
   playableCardIds,
   isFullscreen = false,
   onToggleFullscreen,
@@ -141,6 +145,10 @@ export const MatatuTableView: React.FC<MatatuTableViewProps> = ({
   const effectiveFullscreen = onToggleFullscreen ? isFullscreen : localFs.isFullscreen;
   const handleToggleFullscreen = onToggleFullscreen ?? (() => void localFs.toggleFullscreen());
 
+  const activeVariant: CardDeckVariant =
+    variant ?? (/\bblitz\b/i.test(gameState.roomName || '') ? 'blitz' : 'royale');
+  const isBlitz = activeVariant === 'blitz';
+
   const mySeat = gameState.seats.find((s) => s.uid === viewerUid);
   const opponentSeats = gameState.seats.filter((s) => s.uid !== viewerUid);
   const primaryOpponent = opponentSeats[0];
@@ -153,7 +161,9 @@ export const MatatuTableView: React.FC<MatatuTableViewProps> = ({
       className={
         !onToggleFullscreen && localFs.isFullscreen
           ? 'fixed inset-0 z-50 h-dvh w-screen overflow-y-auto bg-[#050C08] p-3 sm:p-4'
-          : 'relative overflow-hidden rounded-[26px] border-[3px] border-[#C99B27]/85 bg-[#120B05] p-1.5 sm:p-2 shadow-[0_30px_70px_rgba(0,0,0,0.92)]'
+          : `relative overflow-hidden rounded-[26px] border-[3px] ${
+              isBlitz ? 'border-[#FFD76A]/90' : 'border-[#C99B27]/85'
+            } bg-[#120B05] p-1.5 sm:p-2 shadow-[0_30px_70px_rgba(0,0,0,0.92)]`
       }
     >
       {/* Clean Architectural Studio Frame */}
@@ -170,28 +180,37 @@ export const MatatuTableView: React.FC<MatatuTableViewProps> = ({
             effectiveFullscreen ? 'px-3 py-3 sm:px-5 sm:py-4 gap-3' : 'px-4 py-5 sm:px-7 sm:py-6 gap-4'
           }`}
         >
-          {/* Top Signature Banner: UGANDAN MATATU + Royal Crown Crest */}
-          <div className="flex flex-col items-center text-center gap-1">
-            <div className="flex items-center gap-2">
-              <span className="h-[1px] w-8 sm:w-14 bg-gradient-to-r from-transparent to-[#FFD76A]/80" />
-              <div className="flex items-center gap-2">
-                <span className="font-casino text-sm sm:text-lg font-black tracking-[0.14em] gold-text-gradient uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]">
-                  UGANDAN MATATU
+          {/* Top Signature Banner: UGANDAN MATATU ROYALE / MATATU BLITZ + HD Crest */}
+          <div className="flex flex-col items-center text-center gap-1.5">
+            <div className="flex items-center gap-2.5">
+              <span className="h-[1px] w-6 sm:w-12 bg-gradient-to-r from-transparent to-[#FFD76A]/80" />
+              <div className="flex items-center gap-2.5">
+                <img
+                  src={isBlitz ? tileMatatuBlitzImg : tileMatatuRoyaleImg}
+                  alt={isBlitz ? 'Matatu Blitz HD Emblem' : 'Matatu Royale HD Emblem'}
+                  referrerPolicy="no-referrer"
+                  className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg object-cover border border-[#FFD76A]/80 shadow-md shrink-0"
+                />
+                <span className="font-casino text-sm sm:text-lg font-black tracking-[0.14em] gold-text-gradient uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] whitespace-nowrap">
+                  {isBlitz ? 'MATATU BLITZ · TURBO' : 'UGANDAN MATATU ROYALE'}
                 </span>
-                {/* Miniature Ugandan Flag Emblem */}
-                <span
-                  aria-hidden="true"
-                  className="inline-flex flex-col h-3 w-4.5 overflow-hidden rounded-[2px] border border-[#FFD76A]/70 shadow-sm"
-                >
-                  <span className="flex-1 bg-black" />
-                  <span className="flex-1 bg-[#FCDC04]" />
-                  <span className="flex-1 bg-[#D90000]" />
-                  <span className="flex-1 bg-black" />
-                  <span className="flex-1 bg-[#FCDC04]" />
-                  <span className="flex-1 bg-[#D90000]" />
-                </span>
+                {isBlitz ? (
+                  <Zap className="h-4 w-4 text-[#9CE800] shrink-0" aria-hidden="true" />
+                ) : (
+                  <span
+                    aria-hidden="true"
+                    className="inline-flex flex-col h-3 w-4.5 overflow-hidden rounded-[2px] border border-[#FFD76A]/70 shadow-sm shrink-0"
+                  >
+                    <span className="flex-1 bg-black" />
+                    <span className="flex-1 bg-[#FCDC04]" />
+                    <span className="flex-1 bg-[#D90000]" />
+                    <span className="flex-1 bg-black" />
+                    <span className="flex-1 bg-[#FCDC04]" />
+                    <span className="flex-1 bg-[#D90000]" />
+                  </span>
+                )}
               </div>
-              <span className="h-[1px] w-8 sm:w-14 bg-gradient-to-l from-transparent to-[#FFD76A]/80" />
+              <span className="h-[1px] w-6 sm:w-12 bg-gradient-to-l from-transparent to-[#FFD76A]/80" />
             </div>
 
             {!effectiveFullscreen && <RoyalCrownCrestSvg />}
@@ -203,6 +222,7 @@ export const MatatuTableView: React.FC<MatatuTableViewProps> = ({
             viewerUid={viewerUid}
             isYourTurn={isYourTurn}
             playableCardIds={playableCardIds}
+            variant={activeVariant}
             isFullscreen={effectiveFullscreen}
             onToggleFullscreen={handleToggleFullscreen}
             onCardClick={onCardClick}
@@ -353,6 +373,7 @@ export const MatatuTableView: React.FC<MatatuTableViewProps> = ({
                   key={card.id}
                   card={card}
                   size="md"
+                  variant={activeVariant}
                   playable={playable}
                   disabled={!playable}
                   onClick={playable ? () => onCardClick(card) : undefined}

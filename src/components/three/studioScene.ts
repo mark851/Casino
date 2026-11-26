@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 export type CameraPresetKey = 'default' | 'overhead' | 'dramatic';
 
@@ -16,6 +17,10 @@ export interface StudioRigOptions {
   maxDistance: number;
   roomTheme: 'chess' | 'drafts' | 'ludo' | 'matatu';
   antiGlareBoard?: boolean;
+  toneMappingExposure?: number;
+  hemiIntensity?: number;
+  keyIntensity?: number;
+  rimIntensity?: number;
 }
 
 export interface StudioRig {
@@ -28,6 +33,21 @@ export interface StudioRig {
   trackMaterial: <T extends THREE.Material>(m: T) => T;
   trackTexture: <T extends THREE.Texture>(t: T) => T;
   dispose: () => void;
+}
+
+function detectSoftwareGl(): boolean {
+  try {
+    const probe = document.createElement('canvas');
+    const gl = probe.getContext('webgl2') || probe.getContext('webgl');
+    if (!gl) return true;
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    const param = ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER;
+    const gpu = String(gl.getParameter(param) || '');
+    gl.getExtension('WEBGL_lose_context')?.loseContext();
+    return /SwiftShader|llvmpipe|softpipe|Software|Basic Render/i.test(gpu);
+  } catch {
+    return false;
+  }
 }
 
 export function fitCameraFovForAspect(
@@ -49,45 +69,64 @@ export function fitCameraFovForAspect(
 }
 
 export function scheduleSoftwareGlFrame(
-  _renderer: THREE.WebGLRenderer,
+  renderer: THREE.WebGLRenderer,
   done: () => void,
   onTimerId: (id: number) => void
 ): void {
-  const tid = window.setTimeout(done, 32);
-  onTimerId(tid);
+  try {
+    const gl = renderer.getContext() as WebGL2RenderingContext;
+    if (typeof gl.fenceSync === 'function') {
+      const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+      gl.flush();
+      const poll = () => {
+        const state = sync ? gl.getSyncParameter(sync, gl.SYNC_STATUS) : gl.SIGNALED;
+        if (state === gl.UNSIGNALED) {
+          onTimerId(window.setTimeout(poll, 6));
+        } else {
+          if (sync) gl.deleteSync(sync);
+          onTimerId(window.setTimeout(done, 80));
+        }
+      };
+      onTimerId(window.setTimeout(poll, 6));
+      return;
+    }
+  } catch {
+    // Fallback below
+  }
+  onTimerId(window.setTimeout(done, 80));
 }
 
 export function createStudioRig(container: HTMLElement, opts: StudioRigOptions): StudioRig {
   const width = Math.max(320, container.clientWidth);
   const height = Math.max(260, container.clientHeight);
+  const isSoftwareGl = detectSoftwareGl();
 
   const renderer = new THREE.WebGLRenderer({
-    antialias: true,
+    antialias: !isSoftwareGl,
     alpha: false,
     powerPreference: 'high-performance',
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(width, height, false);
-  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.enabled = !isSoftwareGl;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = opts.antiGlareBoard ? 0.96 : 1.08;
+  renderer.toneMappingExposure = opts.toneMappingExposure ?? (opts.antiGlareBoard ? 0.98 : 1.1);
   renderer.domElement.style.width = '100%';
   renderer.domElement.style.height = '100%';
   renderer.domElement.style.display = 'block';
   container.innerHTML = '';
   container.appendChild(renderer.domElement);
 
-  const gl = renderer.getContext();
-  const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-  const rendererStr = debugInfo
-    ? String(gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) || '')
-    : '';
-  const isSoftwareGl = /swiftshader|llvmpipe|software/i.test(rendererStr);
-
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(opts.backgroundHex);
   scene.fog = new THREE.FogExp2(opts.fogHex, opts.fogDensity);
+
+  const pmremGenerator = new THREE.PMREMGenerator(renderer);
+  const envRenderTarget = pmremGenerator.fromScene(new RoomEnvironment(), 0.04);
+  scene.environment = envRenderTarget.texture;
+  pmremGenerator.dispose();
 
   const camera = new THREE.PerspectiveCamera(opts.fov, width / height, 0.1, 100);
   camera.position.set(...opts.initialCamera);
@@ -95,7 +134,7 @@ export function createStudioRig(container: HTMLElement, opts: StudioRigOptions):
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.target.set(...opts.initialTarget);
-  controls.enableDamping = true;
+  controls.enableDamping = !isSoftwareGl;
   controls.dampingFactor = 0.08;
   controls.minDistance = opts.minDistance;
   controls.maxDistance = opts.maxDistance;
@@ -104,13 +143,20 @@ export function createStudioRig(container: HTMLElement, opts: StudioRigOptions):
   controls.update();
 
   // Studio Three-Point Lighting
-  const hemi = new THREE.HemisphereLight(0xfff4d6, 0x061b10, opts.antiGlareBoard ? 0.9 : 0.72);
+  const hemi = new THREE.HemisphereLight(
+    0xfff6dc,
+    0x082616,
+    opts.hemiIntensity ?? (opts.antiGlareBoard ? 0.88 : 0.78)
+  );
   scene.add(hemi);
 
-  const keyLight = new THREE.DirectionalLight(0xfff5dc, opts.antiGlareBoard ? 1.35 : 1.75);
+  const keyLight = new THREE.DirectionalLight(
+    0xfff7e2,
+    opts.keyIntensity ?? (opts.antiGlareBoard ? 1.35 : 1.8)
+  );
   keyLight.position.set(6, 13, 7);
-  keyLight.castShadow = true;
-  keyLight.shadow.mapSize.set(1024, 1024);
+  keyLight.castShadow = !isSoftwareGl;
+  keyLight.shadow.mapSize.set(isSoftwareGl ? 1024 : 2048, isSoftwareGl ? 1024 : 2048);
   keyLight.shadow.camera.near = 1;
   keyLight.shadow.camera.far = 32;
   const b = opts.shadowBounds;
@@ -118,10 +164,11 @@ export function createStudioRig(container: HTMLElement, opts: StudioRigOptions):
   keyLight.shadow.camera.right = b;
   keyLight.shadow.camera.top = b;
   keyLight.shadow.camera.bottom = -b;
-  keyLight.shadow.bias = -0.0008;
+  keyLight.shadow.bias = -0.0005;
+  keyLight.shadow.normalBias = 0.02;
   scene.add(keyLight);
 
-  const rimLight = new THREE.DirectionalLight(0x49c98a, 0.55);
+  const rimLight = new THREE.DirectionalLight(0x6ae6a8, opts.rimIntensity ?? 0.6);
   rimLight.position.set(-8, 7, -7);
   scene.add(rimLight);
 
@@ -144,6 +191,7 @@ export function createStudioRig(container: HTMLElement, opts: StudioRigOptions):
 
   const dispose = () => {
     controls.dispose();
+    envRenderTarget.dispose();
     geometries.forEach((g) => g.dispose());
     materials.forEach((m) => m.dispose());
     textures.forEach((t) => t.dispose());
@@ -210,8 +258,8 @@ export function buildLuxuryRoomEnvironment(
   const ringMat = trackMaterial(
     new THREE.MeshStandardMaterial({
       color: 0xd4af37,
-      roughness: 0.3,
-      metalness: 0.85,
+      roughness: 0.25,
+      metalness: 0.9,
     })
   );
   const baseRing = new THREE.Mesh(
@@ -224,7 +272,7 @@ export function buildLuxuryRoomEnvironment(
 
   return {
     updateBackgroundGameplay: (_elapsed: number, _dt: number) => {
-      // Subtle ambient floor stability without distracting motion
+      // Stable luxury arena lighting
     },
   };
 }
@@ -235,22 +283,22 @@ export function createMahoganyTexture(
   darkHex = '#1f0b04'
 ): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 512;
+  canvas.width = 1024;
+  canvas.height = 1024;
   const ctx = canvas.getContext('2d')!;
-  const grad = ctx.createLinearGradient(0, 0, 512, 512);
+  const grad = ctx.createLinearGradient(0, 0, 1024, 1024);
   grad.addColorStop(0, lightHex);
   grad.addColorStop(0.5, darkHex);
   grad.addColorStop(1, lightHex);
   ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 512, 512);
+  ctx.fillRect(0, 0, 1024, 1024);
 
-  ctx.strokeStyle = 'rgba(0,0,0,0.22)';
-  for (let y = 0; y < 512; y += 6) {
-    ctx.lineWidth = 1 + (y % 3);
+  ctx.strokeStyle = 'rgba(0,0,0,0.24)';
+  for (let y = 0; y < 1024; y += 8) {
+    ctx.lineWidth = 1.5 + (y % 3);
     ctx.beginPath();
     ctx.moveTo(0, y);
-    ctx.bezierCurveTo(170, y + ((y % 7) - 3), 340, y - ((y % 5) - 2), 512, y);
+    ctx.bezierCurveTo(340, y + ((y % 13) - 6), 680, y - ((y % 11) - 5), 1024, y);
     ctx.stroke();
   }
 
@@ -298,20 +346,27 @@ export function createMarbleStoneTexture(
 
 export function createFeltTexture(maxAnisotropy: number): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 512;
+  canvas.width = 1024;
+  canvas.height = 1024;
   const ctx = canvas.getContext('2d')!;
-  const grad = ctx.createRadialGradient(256, 256, 20, 256, 256, 360);
-  grad.addColorStop(0, '#0f6a3c');
-  grad.addColorStop(0.6, '#084726');
+  const grad = ctx.createRadialGradient(512, 512, 32, 512, 512, 720);
+  grad.addColorStop(0, '#127a46');
+  grad.addColorStop(0.6, '#084b29');
   grad.addColorStop(1, '#042a16');
   ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 512, 512);
+  ctx.fillRect(0, 0, 1024, 1024);
 
-  ctx.fillStyle = 'rgba(255,255,255,0.02)';
-  for (let i = 0; i < 1800; i += 1) {
-    const x = (i * 73) % 512;
-    const y = (i * 137) % 512;
+  // Crisp woven baize micro-grain
+  ctx.fillStyle = 'rgba(255,255,255,0.025)';
+  for (let i = 0; i < 5200; i += 1) {
+    const x = (i * 73) % 1024;
+    const y = (i * 137) % 1024;
+    ctx.fillRect(x, y, 2, 2);
+  }
+  ctx.fillStyle = 'rgba(0,0,0,0.035)';
+  for (let i = 0; i < 3600; i += 1) {
+    const x = (i * 109 + 17) % 1024;
+    const y = (i * 193 + 29) % 1024;
     ctx.fillRect(x, y, 2, 2);
   }
 
