@@ -82,9 +82,23 @@ function cr_marzpay_map_status(mixed $raw): string
 function cr_marzpay_safe_callback_url(): ?string
 {
     $appUrl = cr_env('APP_URL');
-    if ($appUrl === '') {
+    $scriptDir = str_replace('\\', '/', dirname((string) ($_SERVER['SCRIPT_NAME'] ?? '/api.php')));
+    $basePath = ($scriptDir === '/' || $scriptDir === '.' || $scriptDir === '') ? '' : rtrim($scriptDir, '/');
+
+    if ($appUrl === '' || $appUrl === 'MY_APP_URL') {
+        $isHttps = (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off')
+            || strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https'
+            || (int) ($_SERVER['SERVER_PORT'] ?? 0) === 443;
+        $reqHost = trim((string) ($_SERVER['HTTP_HOST'] ?? ''));
+        $hostOnly = strtolower((string) (preg_replace('/:\d+$/', '', $reqHost) ?? ''));
+        if ($isHttps && $hostOnly !== '' && $hostOnly !== 'localhost' && !str_ends_with($hostOnly, '.local')) {
+            if (!filter_var($hostOnly, FILTER_VALIDATE_IP) || filter_var($hostOnly, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+                return "https://{$hostOnly}{$basePath}/api.php?action=marzpay-webhook";
+            }
+        }
         return null;
     }
+
     $parts = parse_url($appUrl);
     if (!is_array($parts)) {
         return null;
@@ -97,7 +111,8 @@ function cr_marzpay_safe_callback_url(): ?string
     if (filter_var($host, FILTER_VALIDATE_IP) && !filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
         return null;
     }
-    return "https://{$host}/api.php?action=marzpay-webhook";
+    $appPath = rtrim((string) ($parts['path'] ?? ''), '/');
+    return "https://{$host}{$appPath}/api.php?action=marzpay-webhook";
 }
 
 function cr_marzpay_detect_outbound_ip(): ?string
@@ -190,6 +205,23 @@ function cr_marzpay_request(string $method, string $endpointPath, ?array $payloa
 
     if ($httpCode < 200 || $httpCode >= 300) {
         $errMsg = (string) ($decoded['message'] ?? $decoded['error'] ?? "MarzPay API returned HTTP {$httpCode}.");
+        if (is_array($decoded['errors'] ?? null)) {
+            foreach ($decoded['errors'] as $fieldMsgs) {
+                if (is_array($fieldMsgs) && !empty($fieldMsgs[0]) && is_string($fieldMsgs[0])) {
+                    $detail = trim($fieldMsgs[0]);
+                    if ($detail !== '' && stripos($errMsg, $detail) === false) {
+                        $errMsg = stripos($errMsg, 'invalid') !== false ? $detail : ($errMsg . ' (' . $detail . ')');
+                    }
+                    break;
+                } elseif (is_string($fieldMsgs) && trim($fieldMsgs) !== '') {
+                    $detail = trim($fieldMsgs);
+                    if (stripos($errMsg, $detail) === false) {
+                        $errMsg = stripos($errMsg, 'invalid') !== false ? $detail : ($errMsg . ' (' . $detail . ')');
+                    }
+                    break;
+                }
+            }
+        }
         if (preg_match('/not whitelisted|ip whitelist/i', $errMsg)) {
             $reportedIp = is_string($decoded['ip'] ?? null) && filter_var(trim($decoded['ip']), FILTER_VALIDATE_IP)
                 ? trim($decoded['ip'])
@@ -212,7 +244,8 @@ function cr_marzpay_request(string $method, string $endpointPath, ?array $payloa
  */
 function cr_marzpay_format_metadata(string $reference, array $extraMetadata = []): array
 {
-    $normalized = [['casinoReference' => $reference]];
+    $cleanRef = trim($reference);
+    $normalized = $cleanRef !== '' ? [['casinoReference' => $cleanRef]] : [];
     foreach ($extraMetadata as $entry) {
         if (!is_array($entry)) {
             continue;
@@ -245,7 +278,7 @@ function cr_marzpay_format_metadata(string $reference, array $extraMetadata = []
             break;
         }
     }
-    return array_slice($normalized, 0, 9);
+    return array_values(array_slice($normalized, 0, 9));
 }
 
 /**

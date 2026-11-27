@@ -57,18 +57,20 @@ async function fetchWithPhpFallback(url: string, init?: RequestInit): Promise<Re
     );
   }
 
-  // When running on Apache/cPanel PHP without Node.js and without mod_rewrite,
-  // /api/* returns a 404 HTML page; transparently fall back to api.php?route=...
-  const isHtml404 = (res: Response) => {
+  // When running on Apache/cPanel PHP without Node.js and without mod_rewrite (or if SPA rewrite
+  // served index.html), /api/* returns HTML instead of JSON; transparently fall back to api.php?route=...
+  const isHtmlFallbackOr404 = (res: Response) => {
     const ct = (res.headers.get('content-type') || '').toLowerCase();
-    return res.status === 404 && !ct.includes('application/json') && !ct.includes('application/sql');
+    const isBinaryOrApi = ct.includes('application/json') || ct.includes('application/sql');
+    if (ct.includes('text/html')) return true;
+    return res.status === 404 && !isBinaryOrApi;
   };
 
-  if (isHtml404(response)) {
+  if (isHtmlFallbackOr404(response)) {
     for (const phpUrl of resolvePhpFallbackUrls(url)) {
       try {
         const retry = await fetch(phpUrl, opts);
-        if (!isHtml404(retry)) {
+        if (!isHtmlFallbackOr404(retry)) {
           return retry;
         }
         response = retry;
@@ -99,6 +101,10 @@ export async function fetchApiJson<T>(url: string, init?: RequestInit): Promise<
       (parsed && typeof parsed.message === 'string' && parsed.message) ||
       `Request failed with status ${response.status}.`;
     throw new Error(serverMsg);
+  }
+
+  if (text && parsed === null) {
+    throw new Error('Server returned an unexpected HTML/non-JSON response. Check api.php and .htaccess in cPanel.');
   }
 
   return (parsed ?? {}) as T;

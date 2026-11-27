@@ -813,49 +813,49 @@ export const AdminCpanelPage: React.FC = () => {
           </form>
         </div>
 
-        {/* Spaceship cPanel Node.js Deployment Guide */}
+        {/* Spaceship cPanel PHP & MySQL Deployment Guide */}
         <section className="emerald-card-surface rounded-2xl border border-[#D4AF37]/30 p-6 space-y-3">
           <div className="flex items-center gap-2">
             <Terminal className="h-4 w-4 text-[#FFD76A]" />
             <h3 className="font-display text-lg font-bold text-white">
-              Spaceship cPanel Node.js &amp; Database Connection Guide
+              Spaceship cPanel PHP &amp; MySQL Connection Guide (No Node.js Required)
             </h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-neutral-300">
             <div className="rounded-xl border border-white/10 bg-[#03140B] p-4 space-y-1.5">
               <p className="font-semibold text-[#FFD76A] flex items-center gap-1.5">
                 <ShieldCheck className="h-3.5 w-3.5" />
-                <span>1. Create Database in cPanel</span>
+                <span>1. Create MySQL Database in cPanel</span>
               </p>
               <p>
-                Open Spaceship cPanel → MySQL Databases or PostgreSQL Databases, create your
-                database and user, and assign ALL PRIVILEGES.
+                Open Spaceship cPanel → MySQL Databases, create your database and user, and assign
+                ALL PRIVILEGES. Upload <code className="text-emerald-300">casinoroyale-dist.zip</code>{' '}
+                (or <code className="text-emerald-300">casinoroyale-admin-dist.zip</code>) and extract.
               </p>
             </div>
             <div className="rounded-xl border border-white/10 bg-[#03140B] p-4 space-y-1.5">
               <p className="font-semibold text-[#FFD76A] flex items-center gap-1.5">
                 <Database className="h-3.5 w-3.5" />
-                <span>2. Set Server Env Variables</span>
+                <span>2. Add DB &amp; MarzPay Credentials</span>
               </p>
               <p>
-                In Setup Node.js App (or AI Studio Secrets), set{' '}
-                <code className="text-emerald-300">DB_DRIVER=mysql</code>,{' '}
-                <code className="text-emerald-300">DB_HOST</code>,{' '}
-                <code className="text-emerald-300">DB_NAME</code>,{' '}
-                <code className="text-emerald-300">DB_USER</code>,{' '}
-                <code className="text-emerald-300">DB_PASSWORD</code>, and optional{' '}
-                <code className="text-emerald-300">CPANEL_API_TOKEN</code>.
+                Create <code className="text-emerald-300">casinoug-secrets.php</code> from{' '}
+                <code className="text-emerald-300">casinoug-secrets.example.php</code> (or fill{' '}
+                <code className="text-emerald-300">.env</code> / <code className="text-emerald-300">.htaccess</code>) with{' '}
+                <code className="text-emerald-300">DB_NAME</code>, <code className="text-emerald-300">DB_USER</code>,{' '}
+                <code className="text-emerald-300">DB_PASSWORD</code>, and{' '}
+                <code className="text-emerald-300">MARZPAY_API_KEY</code>.
               </p>
             </div>
             <div className="rounded-xl border border-white/10 bg-[#03140B] p-4 space-y-1.5">
               <p className="font-semibold text-[#FFD76A] flex items-center gap-1.5">
                 <Server className="h-3.5 w-3.5" />
-                <span>3. Boot Application Entry</span>
+                <span>3. Sync Tables via PHP API</span>
               </p>
               <p>
-                Set Application Startup File to <code className="text-emerald-300">server.ts</code>{' '}
-                (with <code className="text-emerald-300">npm run build &amp;&amp; npm start</code>),
-                then click <strong>Sync All Tables</strong> above.
+                Requests automatically route through <code className="text-emerald-300">api.php</code>{' '}
+                using PHP PDO &amp; cURL without Node.js. Click <strong>Sync All Tables</strong> above
+                (or import <code className="text-emerald-300">casino_royale.sql</code> in phpMyAdmin).
               </p>
             </div>
           </div>

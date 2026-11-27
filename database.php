@@ -249,18 +249,21 @@ class CasinoRoyaleDatabase
         string $note = '',
         string $initialStatus = 'Verified',
         string $externalRef = '',
-        ?string $customReference = null
+        ?string $customReference = null,
+        string $txType = 'Deposit'
     ): array {
         if ($amountUgx < self::MIN_DEPOSIT_UGX || $amountUgx > self::MAX_DEPOSIT_UGX) {
             throw new InvalidArgumentException('Deposit amount outside allowed UGX limits.');
         }
 
         $safeStatus = $initialStatus === 'Pending' ? 'Pending' : 'Verified';
+        $safeTxType = $txType === 'Admin Adjustment' ? 'Admin Adjustment' : 'Deposit';
         $nowMs = (int) round(microtime(true) * 1000);
         $txId = 'tx_' . $nowMs . '_' . bin2hex(random_bytes(3));
+        $refPrefix = $safeTxType === 'Admin Adjustment' ? 'CR-ADJ-' : 'CR-DEP-';
         $reference = ($customReference !== null && $customReference !== '')
             ? $customReference
-            : ('CR-DEP-' . random_int(100000, 999999));
+            : ($refPrefix . random_int(100000, 999999));
 
         $this->pdo->beginTransaction();
         try {
@@ -283,7 +286,7 @@ class CasinoRoyaleDatabase
                 $txId,
                 $uid,
                 $wallet['player_id'],
-                'Deposit',
+                $safeTxType,
                 $provider,
                 substr($phoneNumber, 0, 64),
                 $amountUgx,
@@ -916,21 +919,22 @@ class CasinoRoyaleDatabase
         }
         unset($userPayload['passwordHash']);
         $userObj = array_merge([
+            'dateOfBirth' => '1995-01-01',
+            'termsAccepted' => true,
+            'emailVerified' => true,
+            'phoneVerified' => false,
+            'createdAt' => (int) ($uRow['updated_at'] ?? 0),
+        ], $userPayload, [
             'uid' => (string) $uRow['uid'],
             'playerId' => (string) $uRow['player_id'],
             'fullName' => (string) $uRow['full_name'],
             'email' => (string) $uRow['email'],
             'phone' => (string) ($uRow['phone'] ?? ''),
-            'dateOfBirth' => '1995-01-01',
-            'termsAccepted' => true,
-            'emailVerified' => true,
-            'phoneVerified' => false,
             'kycStatus' => (string) ($uRow['kyc_status'] ?? 'Not Submitted'),
             'accountStatus' => (string) ($uRow['account_status'] ?? 'Pending'),
             'role' => (string) ($uRow['role'] ?? 'player'),
-            'createdAt' => (int) ($uRow['updated_at'] ?? 0),
             'updatedAt' => (int) ($uRow['updated_at'] ?? 0),
-        ], $userPayload);
+        ]);
 
         $pStmt = $this->pdo->prepare('SELECT * FROM cr_player_profiles WHERE uid = ? LIMIT 1');
         $pStmt->execute([$uid]);
@@ -1172,7 +1176,7 @@ class CasinoRoyaleDatabase
             $payload = json_decode((string) ($row['payload_json'] ?? '{}'), true);
             $obj = is_array($payload) ? $payload : [];
             unset($obj['passwordHash']);
-            $users[(string) $row['uid']] = array_merge([
+            $users[(string) $row['uid']] = array_merge($obj, [
                 'uid' => (string) $row['uid'],
                 'playerId' => (string) $row['player_id'],
                 'fullName' => (string) $row['full_name'],
@@ -1182,7 +1186,7 @@ class CasinoRoyaleDatabase
                 'accountStatus' => (string) $row['account_status'],
                 'role' => (string) $row['role'],
                 'updatedAt' => (int) $row['updated_at'],
-            ], $obj);
+            ]);
         }
 
         $playerProfiles = [];
@@ -1271,19 +1275,20 @@ class CasinoRoyaleDatabase
             ];
         }
 
+        $toMap = static fn(array $a) => empty($a) ? (object) [] : $a;
         return [
-            'users' => $users,
-            'playerProfiles' => $playerProfiles,
-            'wallets' => $wallets,
-            'transactions' => $transactions,
-            'kycRecords' => $kycRecords,
-            'tournaments' => $tournaments,
+            'users' => $toMap($users),
+            'playerProfiles' => $toMap($playerProfiles),
+            'wallets' => $toMap($wallets),
+            'transactions' => $toMap($transactions),
+            'kycRecords' => $toMap($kycRecords),
+            'tournaments' => $toMap($tournaments),
             'tournamentEntries' => (object) [],
             'tournamentMatches' => (object) [],
-            'supportTickets' => $supportTickets,
+            'supportTickets' => $toMap($supportTickets),
             'announcements' => (object) [],
             'adminLogs' => $adminLogs,
-            'administrators' => $administrators,
+            'administrators' => $toMap($administrators),
             'systemSettings' => $this->getSystemSettings(),
         ];
     }

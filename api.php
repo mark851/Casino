@@ -28,7 +28,7 @@ const CR_BOOTSTRAPPED_ADMIN_EMAILS = [
     'markniaras@gmail.com',
 ];
 
-function cr_json(int $status, array $payload): never
+function cr_json(int $status, array $payload): void
 {
     http_response_code($status);
     echo json_encode($payload, JSON_UNESCAPED_SLASHES);
@@ -266,8 +266,8 @@ function cr_resolve_route(): string
     }
     if ($route === '' && !empty($_SERVER['REQUEST_URI'])) {
         $path = (string) parse_url((string) $_SERVER['REQUEST_URI'], PHP_URL_PATH);
-        if (str_starts_with($path, '/api/')) {
-            $route = trim(substr($path, 5), '/');
+        if (preg_match('#(?:^|/)api/(.+)$#', $path, $rm)) {
+            $route = trim((string) $rm[1], '/');
         }
     }
     return strtolower($route !== '' ? $route : 'health');
@@ -474,6 +474,13 @@ try {
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
             $ins->execute([$uid, 'CR-ADM001', 'Royale Admin Operations', $email, '+256700112233', 'admin', 'Approved', 'Active', json_encode($adminObj), $nowMs]);
+            if (cr_db()->getDriver() === 'pgsql') {
+                $pdo->prepare('INSERT INTO cr_wallets (uid, player_id, currency, available_balance, pending_balance, updated_at) VALUES (?, ?, ?, 250000, 0, ?) ON CONFLICT (uid) DO NOTHING')
+                    ->execute([$uid, 'CR-ADM001', 'UGX', $nowMs]);
+            } else {
+                $pdo->prepare('INSERT IGNORE INTO cr_wallets (uid, player_id, currency, available_balance, pending_balance, updated_at) VALUES (?, ?, ?, 250000, 0, ?)')
+                    ->execute([$uid, 'CR-ADM001', 'UGX', $nowMs]);
+            }
             cr_upsert_admin_record($uid, $email, 'Royale Admin Operations');
         } else {
             $uid = (string) $row['uid'];
@@ -595,26 +602,77 @@ try {
         $stmt = $pdo->prepare('SELECT uid, role, account_status, payload_json FROM cr_users WHERE LOWER(email) = ? LIMIT 1');
         $stmt->execute([$email]);
         $row = $stmt->fetch();
-        if (!is_array($row)) {
+        $isBootEmail = in_array($email, CR_BOOTSTRAPPED_ADMIN_EMAILS, true);
+        $isAdminAccount = $isBootEmail || (is_array($row) && ($row['role'] ?? '') === 'admin');
+
+        if (!is_array($row) && !$isBootEmail) {
             cr_json(401, ['ok' => false, 'error' => 'Invalid email or password.']);
         }
-        $payload = json_decode((string) ($row['payload_json'] ?? '{}'), true);
-        $hash = is_array($payload) ? (string) ($payload['passwordHash'] ?? '') : '';
-        if ($hash === '' || !password_verify($password, $hash)) {
-            cr_json(401, ['ok' => false, 'error' => 'Invalid email or password.']);
-        }
-        if (($row['account_status'] ?? '') === 'Suspended') {
+        if (is_array($row) && ($row['account_status'] ?? '') === 'Suspended') {
             cr_json(403, ['ok' => false, 'error' => 'Account suspended.']);
         }
 
-        $uid = (string) $row['uid'];
-        $role = (string) ($row['role'] ?? 'player');
-        $userObj = is_array($payload) ? $payload : [];
-        unset($userObj['passwordHash']);
+        $payload = is_array($row) ? json_decode((string) ($row['payload_json'] ?? '{}'), true) : [];
+        $hash = is_array($payload) ? (string) ($payload['passwordHash'] ?? '') : '';
+
+        $verified = false;
+        if ($isAdminAccount) {
+            $cfg = cr_get_config();
+            $envPasscode = (string) ($cfg['admin_passcode'] ?? '');
+            $kv = cr_get_kv('admin_credential_hash');
+            $kvHash = is_array($kv) ? (string) ($kv['hash'] ?? '') : '';
+            if ($envPasscode !== '' && $password !== '' && hash_equals($envPasscode, $password)) {
+                $verified = true;
+            } elseif ($kvHash !== '' && $isBootEmail && password_verify($password, $kvHash)) {
+                $verified = true;
+            } elseif ($hash !== '' && password_verify($password, $hash)) {
+                $verified = true;
+            }
+        } else {
+            $verified = $hash !== '' && password_verify($password, $hash);
+        }
+
+        if (!$verified) {
+            cr_json(401, ['ok' => false, 'error' => 'Invalid email or password.']);
+        }
+
+        $nowMs = (int) round(microtime(true) * 1000);
+        if (!is_array($row)) {
+            $uid = 'uid_admin_' . base_convert((string) $nowMs, 10, 36);
+            $userObj = [
+                'uid' => $uid,
+                'playerId' => 'CR-ADM001',
+                'fullName' => 'Royale Admin Operations',
+                'email' => $email,
+                'phone' => '+256700112233',
+                'dateOfBirth' => '1992-01-10',
+                'termsAccepted' => true,
+                'emailVerified' => true,
+                'phoneVerified' => true,
+                'kycStatus' => 'Approved',
+                'accountStatus' => 'Active',
+                'role' => 'admin',
+                'createdAt' => $nowMs,
+                'updatedAt' => $nowMs,
+            ];
+            $ins = $pdo->prepare(
+                'INSERT INTO cr_users (uid, player_id, full_name, email, phone, role, kyc_status, account_status, payload_json, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            );
+            $ins->execute([$uid, 'CR-ADM001', 'Royale Admin Operations', $email, '+256700112233', 'admin', 'Approved', 'Active', json_encode($userObj), $nowMs]);
+            cr_upsert_admin_record($uid, $email, 'Royale Admin Operations');
+            $role = 'admin';
+        } else {
+            $uid = (string) $row['uid'];
+            $role = (string) ($row['role'] ?? 'player');
+            $userObj = is_array($payload) ? $payload : [];
+            unset($userObj['passwordHash']);
+        }
+
         $token = cr_issue_token(['uid' => $uid, 'email' => $email, 'role' => $role]);
         $hydration = cr_db()->getPlayerHydration($uid);
         $overview = $role === 'admin' ? cr_db()->getAdminOverview() : null;
-        cr_json(200, ['ok' => true, 'token' => $token, 'user' => $userObj, 'hydration' => $hydration, 'overview' => $overview]);
+        cr_json(200, ['ok' => true, 'token' => $token, 'user' => $hydration['user'] ?? $userObj, 'hydration' => $hydration, 'overview' => $overview]);
     }
 
     if ($route === 'auth/demo-player' && $method === 'POST') {
@@ -796,11 +854,23 @@ try {
         $remote = cr_marzpay_get_transaction($uuid);
         $db = cr_db();
         $matchedTxId = $db->findTxIdByMarzPayUuid($uuid);
+        if ($matchedTxId === null && !empty($txBlock['reference'])) {
+            $refStmt = getDbConnection()->prepare('SELECT tx_id FROM cr_transactions WHERE reference = ? LIMIT 1');
+            $refStmt->execute([trim((string) $txBlock['reference'])]);
+            $refRow = $refStmt->fetch();
+            if (is_array($refRow) && !empty($refRow['tx_id'])) {
+                $matchedTxId = (string) $refRow['tx_id'];
+            }
+        }
         if ($matchedTxId !== null) {
             $row = $db->getTransactionById($matchedTxId);
             if (is_array($row) && $row['tx_type'] === 'Deposit') {
                 $settled = $db->settlePendingDeposit($matchedTxId, (string) $remote['status']);
                 cr_json(200, ['ok' => true, 'matched' => true, 'deposit' => $settled]);
+            }
+            if (is_array($row) && $row['tx_type'] === 'Withdrawal' && $row['status'] === 'Pending' && ($remote['status'] ?? '') === 'completed') {
+                $settled = $db->settleWithdrawal($matchedTxId, 'Paid', 'marzpay_webhook');
+                cr_json(200, ['ok' => true, 'matched' => true, 'withdrawal' => $settled]);
             }
         }
         cr_json(200, ['ok' => true, 'matched' => false]);
@@ -904,8 +974,16 @@ try {
             }
             $insK->execute([$uid, $kycPayload['verification_id'], $kycPayload['player_id'], $legalName, 'Pending Verification', json_encode($kycPayload), $nowMs]);
 
-            $updU = $pdo->prepare('UPDATE cr_users SET full_name = ?, kyc_status = ?, updated_at = ? WHERE uid = ?');
-            $updU->execute([$legalName, 'Pending Verification', $nowMs, $uid]);
+            $uSel = $pdo->prepare('SELECT payload_json FROM cr_users WHERE uid = ? LIMIT 1');
+            $uSel->execute([$uid]);
+            $uRow = $uSel->fetch();
+            $uPayload = is_array($uRow) ? (json_decode((string) ($uRow['payload_json'] ?? '{}'), true) ?: []) : [];
+            $uPayload['fullName'] = $legalName;
+            $uPayload['kycStatus'] = 'Pending Verification';
+            $uPayload['updatedAt'] = $nowMs;
+
+            $updU = $pdo->prepare('UPDATE cr_users SET full_name = ?, kyc_status = ?, payload_json = ?, updated_at = ? WHERE uid = ?');
+            $updU->execute([$legalName, 'Pending Verification', json_encode($uPayload), $nowMs, $uid]);
             $updP = $pdo->prepare('UPDATE cr_player_profiles SET display_name = ?, kyc_status = ?, updated_at = ? WHERE uid = ?');
             $updP->execute([substr($legalName, 0, 80), 'Pending Verification', $nowMs, $uid]);
 
@@ -1022,6 +1100,7 @@ try {
         $targetUid = trim((string) ($body['targetUid'] ?? ''));
         $amount = (int) round((float) ($body['amountUgx'] ?? 0));
         $provider = cr_sanitize_provider((string) ($body['provider'] ?? 'MTN Mobile Money'));
+        $kind = ($body['kind'] ?? '') === 'Admin Adjustment' ? 'Admin Adjustment' : 'Deposit';
         $note = trim((string) ($body['note'] ?? 'Credited via Spaceship cPanel API'));
 
         if ($targetUid === '') {
@@ -1041,7 +1120,11 @@ try {
             $amount,
             $provider,
             (string) ($targetUser['phone'] ?? ''),
-            $note
+            $note,
+            'Verified',
+            '',
+            null,
+            $kind
         );
         $db = cr_db();
         $txRow = $db->getTransactionById((string) $res['txId']) ?: [];
@@ -1091,10 +1174,18 @@ try {
 
         $pdo->beginTransaction();
         try {
+            $uSel = $pdo->prepare('SELECT payload_json FROM cr_users WHERE uid = ? LIMIT 1');
+            $uSel->execute([$targetUid]);
+            $uRow = $uSel->fetch();
+            $uPayload = is_array($uRow) ? (json_decode((string) ($uRow['payload_json'] ?? '{}'), true) ?: []) : [];
+            $uPayload['kycStatus'] = $status;
+            $uPayload['accountStatus'] = $accStatus;
+            $uPayload['updatedAt'] = $nowMs;
+
             $pdo->prepare('UPDATE cr_kyc_records SET verification_status = ?, payload_json = ?, updated_at = ? WHERE uid = ?')
                 ->execute([$status, json_encode($kycObj), $nowMs, $targetUid]);
-            $pdo->prepare('UPDATE cr_users SET kyc_status = ?, account_status = ?, updated_at = ? WHERE uid = ?')
-                ->execute([$status, $accStatus, $nowMs, $targetUid]);
+            $pdo->prepare('UPDATE cr_users SET kyc_status = ?, account_status = ?, payload_json = ?, updated_at = ? WHERE uid = ?')
+                ->execute([$status, $accStatus, json_encode($uPayload), $nowMs, $targetUid]);
             $pdo->prepare('UPDATE cr_player_profiles SET kyc_status = ?, account_status = ?, updated_at = ? WHERE uid = ?')
                 ->execute([$status, $accStatus, $nowMs, $targetUid]);
             $pdo->commit();
@@ -1115,7 +1206,14 @@ try {
         $accStatus = ($body['accountStatus'] ?? '') === 'Suspended' ? 'Suspended' : 'Active';
         $nowMs = (int) round(microtime(true) * 1000);
         $pdo = getDbConnection();
-        $pdo->prepare('UPDATE cr_users SET account_status = ?, updated_at = ? WHERE uid = ?')->execute([$accStatus, $nowMs, $targetUid]);
+        $uSel = $pdo->prepare('SELECT payload_json FROM cr_users WHERE uid = ? LIMIT 1');
+        $uSel->execute([$targetUid]);
+        $uRow = $uSel->fetch();
+        $uPayload = is_array($uRow) ? (json_decode((string) ($uRow['payload_json'] ?? '{}'), true) ?: []) : [];
+        $uPayload['accountStatus'] = $accStatus;
+        $uPayload['updatedAt'] = $nowMs;
+
+        $pdo->prepare('UPDATE cr_users SET account_status = ?, payload_json = ?, updated_at = ? WHERE uid = ?')->execute([$accStatus, json_encode($uPayload), $nowMs, $targetUid]);
         $pdo->prepare('UPDATE cr_player_profiles SET account_status = ?, updated_at = ? WHERE uid = ?')->execute([$accStatus, $nowMs, $targetUid]);
         cr_write_admin_log((string) $admin['uid'], (string) $admin['email'], 'ACCOUNT_' . strtoupper($accStatus), 'user', $targetUid, "Account -> {$accStatus}");
         $hydration = cr_db()->getPlayerHydration($targetUid);

@@ -56,7 +56,8 @@ if (!function_exists('submitDepositDb')) {
         string $note = '',
         string $initialStatus = 'Verified',
         string $externalRef = '',
-        ?string $customReference = null
+        ?string $customReference = null,
+        string $txType = 'Deposit'
     ): array {
         return cr_db()->recordDeposit(
             $uid,
@@ -67,7 +68,8 @@ if (!function_exists('submitDepositDb')) {
             $note,
             $initialStatus,
             $externalRef,
-            $customReference
+            $customReference,
+            $txType
         );
     }
 }

@@ -41,7 +41,8 @@ DirectoryIndex index.html
   RewriteCond %{REQUEST_URI} !^/api\.php$ [NC]
   RewriteRule ^api(?:/(.*))?$ api.php?route=$1 [QSA,L]
 
-  # SPA history fallback for built React frontend (index.html)
+  # SPA history fallback for built React frontend (index.html) - never intercept API routes
+  RewriteCond %{REQUEST_URI} !^/api(?:/|\.php|$) [NC]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule ^ index.html [L]
