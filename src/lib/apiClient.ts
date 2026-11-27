@@ -35,11 +35,11 @@ function buildHeaders(init?: RequestInit): Headers {
   return headers;
 }
 
-function resolvePhpFallbackUrl(url: string): string | null {
-  if (!url.startsWith('/api/')) return null;
+function resolvePhpFallbackUrls(url: string): string[] {
+  if (!url.startsWith('/api/')) return [];
   const route = url.slice(5).replace(/^\/+/, '');
-  if (!route) return '/api.php?route=health';
-  return `/api.php?route=${encodeURIComponent(route)}`;
+  const qs = route ? encodeURIComponent(route) : 'health';
+  return [`/api.php?route=${qs}`, `api.php?route=${qs}`];
 }
 
 async function fetchWithPhpFallback(url: string, init?: RequestInit): Promise<Response> {
@@ -58,14 +58,23 @@ async function fetchWithPhpFallback(url: string, init?: RequestInit): Promise<Re
   }
 
   // When running on Apache/cPanel PHP without Node.js and without mod_rewrite,
-  // /api/* returns a 404 HTML page; transparently fall back to /api.php?route=...
-  const contentType = (response.headers.get('content-type') || '').toLowerCase();
-  const phpUrl = resolvePhpFallbackUrl(url);
-  if (response.status === 404 && phpUrl && !contentType.includes('application/json') && !contentType.includes('application/sql')) {
-    try {
-      return await fetch(phpUrl, opts);
-    } catch {
-      return response;
+  // /api/* returns a 404 HTML page; transparently fall back to api.php?route=...
+  const isHtml404 = (res: Response) => {
+    const ct = (res.headers.get('content-type') || '').toLowerCase();
+    return res.status === 404 && !ct.includes('application/json') && !ct.includes('application/sql');
+  };
+
+  if (isHtml404(response)) {
+    for (const phpUrl of resolvePhpFallbackUrls(url)) {
+      try {
+        const retry = await fetch(phpUrl, opts);
+        if (!isHtml404(retry)) {
+          return retry;
+        }
+        response = retry;
+      } catch {
+        // Keep trying next fallback URL
+      }
     }
   }
 

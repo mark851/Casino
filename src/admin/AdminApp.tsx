@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from '../lib/authContext';
 import { RequireAdminAuth } from './components/RequireAdminAuth';
 import { AdminLoginPage } from './pages/AdminLoginPage';
@@ -136,6 +136,19 @@ export function AdminRoutes() {
 
       <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
     </Routes>
+  );
+}
+
+export function AdminStandaloneApp() {
+  return (
+    <HashRouter>
+      <AuthProvider>
+        <Routes>
+          <Route path="/admin/*" element={<AdminRoutes />} />
+          <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
+        </Routes>
+      </AuthProvider>
+    </HashRouter>
   );
 }
 

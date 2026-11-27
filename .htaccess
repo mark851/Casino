@@ -1,5 +1,6 @@
 # CASINO ROYALE — Spaceship cPanel Apache / LiteSpeed Rules & Env Template
 Options -Indexes
+DirectoryIndex index.html
 
 # Forward Authorization header to PHP API (api.php) on cPanel CGI/FastCGI
 <IfModule mod_setenvif.c>
