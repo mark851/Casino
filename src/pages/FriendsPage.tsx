@@ -15,18 +15,14 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
-import { getStore, subscribeStore } from '../lib/localStore';
 import { useSocial, type CombinedPlayerEntry } from '../lib/socialContext';
 import { pairIdForUids } from '../lib/socialService';
 import { PlayerLayout } from '../components/PlayerLayout';
 import { SendPlayInviteModal } from '../components/LiveSocialOverlay';
 import { ChatTypingBubble } from '../components/ChatTypingBubble';
 import { timestampMs } from '../utils/validation';
-import { normalizeAiConfig } from '../shared/aiPersonas';
-import { requestSmartContenderReply } from '../lib/smartReplyClient';
-import type { DirectMessageRecord } from '../shared/types';
 
-type FriendsTab = 'online' | 'offline' | 'discover' | 'friends' | 'requests' | 'companions';
+type FriendsTab = 'online' | 'offline' | 'discover' | 'friends' | 'requests';
 
 const GAME_NAME: Record<string, string> = {
   matatu: 'Matatu',
@@ -67,9 +63,6 @@ export const FriendsPage: React.FC = () => {
   const [chatDraft, setChatDraft] = useState('');
   const [actionBusy, setActionBusy] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
-  const [aiConfig, setAiConfig] = useState(() => normalizeAiConfig(getStore().aiConfig));
-  const [aiMessages, setAiMessages] = useState<Record<string, DirectMessageRecord[]>>({});
-  const [aiTypingUid, setAiTypingUid] = useState<string | null>(null);
   const [challengeTarget, setChallengeTarget] = useState<{
     uid: string;
     displayName: string;
@@ -79,57 +72,27 @@ export const FriendsPage: React.FC = () => {
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    setAiConfig(normalizeAiConfig(getStore().aiConfig));
-    return subscribeStore(() => {
-      setAiConfig(normalizeAiConfig(getStore().aiConfig));
-    });
-  }, []);
-
-  const aiFriends = useMemo<CombinedPlayerEntry[]>(() => {
-    if (!aiConfig.aiEnabled || !aiConfig.aiChatEnabled) return [];
-    return aiConfig.roster.slice(0, 30).filter((persona) => persona.enabled).map((persona) => ({
-      uid: `virtual_${persona.id}`,
-      playerId: `CR-${persona.id.replace(/[^a-z0-9]/gi, '').slice(-6).toUpperCase().padStart(6, '0')}`,
-      displayName: persona.name,
-      gamesWon: 0,
-      totalGames: 0,
-      presence: {
-        uid: `virtual_${persona.id}`,
-        playerId: persona.id,
-        displayName: persona.name,
-        status: 'online',
-        lastSeenMs: Date.now(),
-      },
-      isOnline: true,
-      friendship: null,
-    }));
-  }, [aiConfig]);
-
-  useEffect(() => {
-    if (!activeChatUid && friends.length > 0) {
-      setActiveChatUid(friends[0].uid);
-    } else if (!activeChatUid && onlinePlayers.length > 0) {
+    if (!activeChatUid && onlinePlayers.length > 0) {
       setActiveChatUid(onlinePlayers[0].uid);
-    } else if (!activeChatUid && aiFriends.length > 0) {
-      setActiveChatUid(aiFriends[0].uid);
+    } else if (!activeChatUid && friends.length > 0) {
+      setActiveChatUid(friends[0].uid);
     }
-  }, [activeChatUid, friends, onlinePlayers, aiFriends, setActiveChatUid]);
+  }, [activeChatUid, friends, onlinePlayers, setActiveChatUid]);
 
   useEffect(() => {
-    if (activeChatUid && !activeChatUid.startsWith('virtual_')) {
+    if (activeChatUid) {
       void loadDirectChat(activeChatUid);
     }
   }, [activeChatUid, loadDirectChat]);
 
   const activeChatPartner = useMemo(
-    () => players.find((p) => p.uid === activeChatUid) || aiFriends.find((p) => p.uid === activeChatUid) || null,
-    [players, aiFriends, activeChatUid]
+    () => players.find((p) => p.uid === activeChatUid) || null,
+    [players, activeChatUid]
   );
 
   const activePairId = activeChatUid && myUid ? pairIdForUids(myUid, activeChatUid) : '';
-  const activeIsAi = Boolean(activeChatUid?.startsWith('virtual_'));
-  const activeMessages = activeIsAi ? (aiMessages[activeChatUid!] || []) : (activePairId ? messagesByPairId[activePairId] || [] : []);
-  const activeTypingUsers = activeIsAi && aiTypingUid === activeChatUid ? [{ uid: activeChatUid!, senderName: activeChatPartner?.displayName || 'Companion' }] : (activePairId ? typingByPairId[activePairId] || [] : []);
+  const activeMessages = activePairId ? messagesByPairId[activePairId] || [] : [];
+  const activeTypingUsers = activePairId ? typingByPairId[activePairId] || [] : [];
 
   useEffect(() => {
     if (chatScrollRef.current) {
@@ -139,15 +102,13 @@ export const FriendsPage: React.FC = () => {
 
   const filteredList = useMemo(() => {
     const base =
-      tab === 'companions'
-        ? aiFriends
-        : tab === 'online'
-        ? [...aiFriends, ...onlinePlayers]
+      tab === 'online'
+        ? onlinePlayers
         : tab === 'offline'
         ? offlinePlayers
         : tab === 'friends'
         ? friends
-        : [...players, ...aiFriends];
+        : players;
     const q = searchQuery.trim().toLowerCase();
     if (!q) return base;
     return base.filter(
@@ -155,7 +116,7 @@ export const FriendsPage: React.FC = () => {
         p.displayName.toLowerCase().includes(q) ||
         p.playerId.toLowerCase().includes(q)
     );
-  }, [tab, aiFriends, onlinePlayers, offlinePlayers, friends, players, searchQuery]);
+  }, [tab, onlinePlayers, offlinePlayers, friends, players, searchQuery]);
 
   const runAction = async (key: string, fn: () => Promise<void>) => {
     setErrorMsg('');
@@ -174,52 +135,6 @@ export const FriendsPage: React.FC = () => {
     if (!activeChatUid || !chatDraft.trim()) return;
     const text = chatDraft.trim();
     setChatDraft('');
-    if (activeChatUid.startsWith('virtual_')) {
-      const persona = aiConfig.roster.find((p) => `virtual_${p.id}` === activeChatUid);
-      if (!persona || !persona.enabled || !aiConfig.aiEnabled || !aiConfig.aiChatEnabled) return;
-      const uid = activeChatUid;
-      const pairId = pairIdForUids(myUid, uid);
-      const userMessage: DirectMessageRecord = {
-        messageId: `msg_${Date.now()}_u`,
-        pairId,
-        participantUids: [myUid, uid],
-        senderUid: myUid,
-        senderName: 'You',
-        text,
-        createdAt: Date.now(),
-      };
-      const history = [...(aiMessages[uid] || []), userMessage];
-      setAiMessages((prev) => ({ ...prev, [uid]: history }));
-      setAiTypingUid(uid);
-      try {
-        const reply = await requestSmartContenderReply({
-          persona,
-          senderName: 'You',
-          text,
-          context: 'lobby',
-          history: history.slice(-10).map((m) => ({
-            senderName: m.senderName,
-            text: m.text,
-            isSelf: m.senderUid === myUid,
-          })),
-        });
-        const aiMessage: DirectMessageRecord = {
-          messageId: `msg_${Date.now()}_a`,
-          pairId,
-          participantUids: [myUid, uid],
-          senderUid: uid,
-          senderName: persona.name,
-          text: reply || 'Good game! Ready whenever you are.',
-          createdAt: Date.now(),
-        };
-        setAiMessages((prev) => ({ ...prev, [uid]: [...(prev[uid] || history), aiMessage].slice(-100) }));
-      } catch {
-        setErrorMsg('Could not get a reply right now. Please try again.');
-      } finally {
-        setAiTypingUid((current) => (current === uid ? null : current));
-      }
-      return;
-    }
     await runAction(`chat_${activeChatUid}`, () => sendDirectMessage(activeChatUid, text));
   };
 
@@ -348,10 +263,10 @@ export const FriendsPage: React.FC = () => {
           <div className="emerald-card-surface rounded-xl border border-[#D4AF37]/30 p-4">
             <p className="text-[11px] uppercase tracking-wider text-neutral-400">Online Right Now</p>
             <p className="font-mono-tabular text-2xl font-extrabold text-[#9CE800] mt-1">
-              {onlinePlayers.length + aiFriends.length + 1}
+              {onlinePlayers.length + 1}
             </p>
             <p className="text-[11px] text-neutral-400 mt-0.5">
-              {onlinePlayers.length} real player{onlinePlayers.length === 1 ? '' : 's'} · {aiFriends.length} virtual companion{aiFriends.length === 1 ? '' : 's'}
+              {onlinePlayers.length} other player{onlinePlayers.length === 1 ? '' : 's'} active now
             </p>
           </div>
           <div className="emerald-card-surface rounded-xl border border-[#D4AF37]/30 p-4">
@@ -394,8 +309,7 @@ export const FriendsPage: React.FC = () => {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-1.5">
                 {[
-                  { id: 'online' as const, label: `Online (${onlinePlayers.length + aiFriends.length})` },
-                  { id: 'companions' as const, label: `Virtual Friends (${aiFriends.length})` },
+                  { id: 'online' as const, label: `Online (${onlinePlayers.length})` },
                   { id: 'offline' as const, label: `Offline (${offlinePlayers.length})` },
                   { id: 'discover' as const, label: `All Players (${players.length})` },
                   { id: 'friends' as const, label: `Friends (${friends.length})` },
@@ -623,22 +537,18 @@ export const FriendsPage: React.FC = () => {
               <div className="rounded-xl border border-white/10 bg-[#04120B] p-8 text-center space-y-2">
                 <Users className="h-8 w-8 text-[#D4AF37]/60 mx-auto" />
                 <p className="text-sm font-semibold text-white">
-                  {tab === 'companions'
-                    ? 'No virtual companions are currently enabled'
-                    : tab === 'online'
+                  {tab === 'online'
                     ? 'No other players are currently online'
                     : tab === 'friends'
                     ? 'No friends added yet'
                     : 'No matching players found'}
                 </p>
                 <p className="text-xs text-neutral-400">
-                  {tab === 'companions'
-                    ? 'Ask an administrator to enable virtual companions in AI Controls.'
-                    : tab === 'online'
-                    ? 'Browse players and virtual companions, or chat with them.'
+                  {tab === 'online'
+                    ? 'Browse all players to find friends, chat, or challenge someone to a match.'
                     : 'Search registered players by name or Player ID to add friends and invite them to play.'}
                 </p>
-                {tab === 'online' && players.length > 0 && aiFriends.length === 0 && (
+                {tab === 'online' && players.length > 0 && (
                   <button
                     type="button"
                     onClick={() => setTab('discover')}
@@ -705,9 +615,7 @@ export const FriendsPage: React.FC = () => {
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2 shrink-0">
-                        {p.uid.startsWith('virtual_') ? (
-                          <span className="rounded-lg border border-[#D4AF37]/30 bg-[#092B1C] px-2.5 py-1.5 text-[11px] text-[#FFD76A]">Virtual companion</span>
-                        ) : renderFriendControl(p)}
+                        {renderFriendControl(p)}
                         <button
                           type="button"
                           onClick={() => setActiveChatUid(p.uid)}
@@ -723,7 +631,7 @@ export const FriendsPage: React.FC = () => {
                         </button>
                         <button
                           type="button"
-                          disabled={!p.isOnline || p.uid.startsWith('virtual_')}
+                          disabled={!p.isOnline}
                           onClick={() =>
                             setChallengeTarget({
                               uid: p.uid,
@@ -732,13 +640,13 @@ export const FriendsPage: React.FC = () => {
                             })
                           }
                           className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-extrabold ${
-                            p.isOnline && !p.uid.startsWith('virtual_')
+                            p.isOnline
                               ? 'gold-shimmer-btn cursor-pointer'
                               : 'border border-white/10 bg-white/5 text-neutral-500 cursor-not-allowed'
                           }`}
                         >
                           <Swords className="h-3.5 w-3.5" />
-                          <span>{p.uid.startsWith('virtual_') ? 'Chat Only' : p.isOnline ? 'Play Together' : 'Offline'}</span>
+                          <span>{p.isOnline ? 'Play Together' : 'Offline'}</span>
                         </button>
                       </div>
                     </div>
@@ -763,10 +671,9 @@ export const FriendsPage: React.FC = () => {
                       <h3 className="font-display text-base font-bold text-white truncate">
                         {activeChatPartner.displayName}
                       </h3>
-                      {activeIsAi && <span className="text-[10px] rounded-full border border-[#D4AF37]/30 px-2 py-0.5 text-[#FFD76A]">Virtual companion</span>}
                     </div>
                     <p className="text-[11px] text-neutral-400 font-mono-tabular">
-                      {activeIsAi ? 'Virtual companion · ' : `${activeChatPartner.playerId} · `}{' '}
+                      {activeChatPartner.playerId} ·{' '}
                       {activeTypingUsers.length > 0 ? (
                         <span className="text-[#FFD76A] font-sans font-semibold">typing…</span>
                       ) : activeChatPartner.isOnline ? (
@@ -779,7 +686,7 @@ export const FriendsPage: React.FC = () => {
 
                   <button
                     type="button"
-                    disabled={!activeChatPartner.isOnline || activeIsAi}
+                    disabled={!activeChatPartner.isOnline}
                     onClick={() =>
                       setChallengeTarget({
                         uid: activeChatPartner.uid,
@@ -788,13 +695,13 @@ export const FriendsPage: React.FC = () => {
                       })
                     }
                     className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-extrabold shrink-0 ${
-                      activeChatPartner.isOnline && !activeIsAi
+                      activeChatPartner.isOnline
                         ? 'gold-shimmer-btn cursor-pointer'
                         : 'border border-white/10 bg-white/5 text-neutral-500 cursor-not-allowed'
                     }`}
                   >
                     <Gamepad2 className="h-3.5 w-3.5" />
-                    <span>{activeIsAi ? 'Chat Companion' : activeChatPartner.isOnline ? 'Invite to Play' : 'Offline'}</span>
+                    <span>{activeChatPartner.isOnline ? 'Invite to Play' : 'Offline'}</span>
                   </button>
                 </div>
 

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <path d="M32 4L56 13v20c0 14-10 23-24 27C18 56 8 47 8 33V13L32 4z" fill="#EF0107" stroke="#C5A059" stroke-width="3"/>
+  <rect x="18" y="25" width="28" height="8" rx="4" fill="#FFFFFF"/>
+  <circle cx="22" cy="36" r="4" fill="#C5A059"/>
+  <text x="32" y="51" text-anchor="middle" font-family="Georgia,serif" font-size="10" font-weight="bold" fill="#FFFFFF">ARS</text>
+</svg>

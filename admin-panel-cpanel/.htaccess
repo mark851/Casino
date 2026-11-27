@@ -1,0 +1,50 @@
+# CASINO ROYALE — Spaceship cPanel Apache / LiteSpeed Rules & Env Template
+Options -Indexes
+DirectoryIndex index.html
+
+# Forward Authorization header to PHP API (api.php) on cPanel CGI/FastCGI
+<IfModule mod_setenvif.c>
+  SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+</IfModule>
+
+# Option: Set MarzPay & DB credentials directly via Apache SetEnv (No Node.js required)
+# Replace placeholders in cPanel File Manager -> Edit .htaccess, or use ../casinoug-secrets.php / ../casinoroyale-secrets.php
+# SetEnv DB_DRIVER "mysql"
+# SetEnv DB_HOST "localhost"
+# SetEnv DB_NAME ""
+# SetEnv DB_USER ""
+# SetEnv DB_PASSWORD ""
+# SetEnv MARZPAY_API_KEY ""
+# SetEnv MARZPAY_API_SECRET ""
+# SetEnv MARZPAY_WEBHOOK_SECRET ""
+# SetEnv MARZPAY_BASE_URL "https://wallet.wearemarz.com/api/v1"
+# SetEnv MARZPAY_COUNTRY "UG"
+
+# Block public HTTP access to .env, SQL dumps, server sources, and internal PHP includes
+<FilesMatch "^(\.env(\..*)?|.*\.sql|.*\.md|config\.php|connection\.php|database\.php|db\.php|marzpay\.php|secrets\.php|.*-secrets\.php|package\.json|package-lock\.json|bun\.lock)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+# Route /api/* REST calls (used by the React frontend) directly to api.php when running without Node.js
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTP:Authorization} ^(.*)
+  RewriteRule .* - [e=HTTP_AUTHORIZATION:%1]
+
+  # Forward /api or /api/... (never /api.php itself) to api.php?route=...
+  RewriteCond %{REQUEST_URI} !^/api\.php$ [NC]
+  RewriteRule ^api(?:/(.*))?$ api.php?route=$1 [QSA,L]
+
+  # SPA history fallback for built React frontend (index.html) - never intercept API routes
+  RewriteCond %{REQUEST_URI} !^/api(?:/|\.php|$) [NC]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^ index.html [L]
+</IfModule>
+

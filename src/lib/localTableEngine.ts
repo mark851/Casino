@@ -62,6 +62,7 @@ export interface LocalTableEngineOptions {
   startImmediately?: boolean;
   tournamentId?: string;
   tournamentMatchId?: string;
+  preferredAiUids?: string[];
   onState: (state: SanitizedGameState) => void;
   onChat: (msg: RoomChatMessage) => void;
   onTyping?: (typing: TypingIndicatorUser & { isTyping: boolean }) => void;
@@ -126,7 +127,14 @@ export class LocalTableEngine {
         ? 2
         : Math.max(2, Math.min(4, this.opts.maxPlayers || 2));
     const botsNeeded = Math.max(1, targetPlayers - 1);
-    const picked = pickBalancedAiPersonas(aiCfg.roster, botsNeeded);
+    const preferred = (this.opts.preferredAiUids || [])
+      .map((id) => aiCfg.roster.find((p) => p.id === id || `virtual_${p.id}` === id))
+      .filter((p): p is AiPersonaProfile => Boolean(p));
+    const randomFill = pickBalancedAiPersonas(
+      aiCfg.roster.filter((p) => !preferred.some((pref) => pref.id === p.id)),
+      botsNeeded
+    );
+    const picked = [...preferred, ...randomFill].slice(0, botsNeeded);
 
     this.seats = [
       {

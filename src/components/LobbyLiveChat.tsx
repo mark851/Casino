@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MessageSquare, Send, ShieldCheck, Users } from 'lucide-react';
 import { useAuth } from '../lib/authContext';
+import { useSocial } from '../lib/socialContext';
 import { getStore, notifyStore, subscribeStore } from '../lib/localStore';
 import {
   generateAiJoinGreeting,
@@ -15,6 +16,7 @@ import { soundFx } from '../utils/sound';
 
 export const LobbyLiveChat: React.FC = () => {
   const { firebaseUser, userDoc, playerProfile } = useAuth();
+  const { onlinePlayers } = useSocial();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const greetedRef = useRef(false);
   const prevCountRef = useRef(0);
@@ -195,9 +197,7 @@ export const LobbyLiveChat: React.FC = () => {
     setDraft('');
   };
 
-  const activeRosterPreview = aiConfig.aiEnabled
-    ? aiConfig.roster.filter((p) => p.enabled).slice(0, 6)
-    : [];
+  const activeRosterPreview = onlinePlayers.slice(0, 6);
 
   return (
     <section className="emerald-card-surface rounded-2xl border border-[#D4AF37]/30 p-5 space-y-4">
@@ -212,7 +212,7 @@ export const LobbyLiveChat: React.FC = () => {
               <span className="inline-block h-2 w-2 rounded-full bg-[#9CE800]" />
             </h3>
             <p className="text-[11px] text-neutral-400">
-              Chat live with players in the arena and active contenders ready to play.
+              Chat live with active players in the arena ready to play.
             </p>
           </div>
         </div>
@@ -221,8 +221,8 @@ export const LobbyLiveChat: React.FC = () => {
           <Users className="h-3.5 w-3.5 text-[#FFD76A]" />
           <span className="truncate max-w-[260px]">
             {activeRosterPreview.length > 0
-              ? `Online: ${activeRosterPreview.map((p) => p.name.split(' ')[0]).join(', ')}`
-              : 'No contenders online'}
+              ? `Online: ${activeRosterPreview.map((p) => p.displayName.split(' ')[0]).join(', ')}`
+              : 'No players online'}
           </span>
         </div>
       </div>

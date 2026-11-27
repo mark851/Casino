@@ -1,7 +1,7 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './authContext';
-import { getStore, subscribeStore } from './localStore';
+import { getStore, notifyStore, subscribeStore } from './localStore';
 import {
   fetchDirectChatHistoryApi,
   isPresenceOnline,
@@ -14,6 +14,8 @@ import {
   sendPlayInviteApi,
 } from './socialService';
 import { createLocalRoom } from './roomFallbackService';
+import { requestSmartContenderReply } from './smartReplyClient';
+import { contenderPlayerId, normalizeAiConfig } from '../shared/aiPersonas';
 import { generatePlayerId } from '../utils/validation';
 import { soundFx } from '../utils/sound';
 import type { TypingIndicatorUser } from '../components/ChatTypingBubble';
@@ -25,6 +27,17 @@ import type {
   PlayerPresenceRecord,
   TableGameType,
 } from '../shared/types';
+
+function stableMixRank(uid: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < uid.length; i += 1) {
+    h ^= uid.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+const VIRTUAL_GAMES: TableGameType[] = ['matatu', 'ludo', 'chess', 'drafts'];
 
 export interface CombinedPlayerEntry {
   uid: string;
@@ -91,11 +104,20 @@ export const SocialProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const [, setStoreTick] = useState(0);
   const [unreadSenders, setUnreadSenders] = useState<Record<string, number>>({});
+  const [typingByPairId, setTypingByPairId] = useState<Record<string, TypingIndicatorUser[]>>({});
   const [activeChatUid, setActiveChatUidState] = useState<string | null>(null);
   const [chatDrawerOpen, setChatDrawerOpen] = useState(false);
+  const timersRef = useRef<number[]>([]);
 
   useEffect(() => {
     return subscribeStore(() => setStoreTick((t) => t + 1));
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      timersRef.current.forEach((id) => window.clearTimeout(id));
+      timersRef.current = [];
+    };
   }, []);
 
   const myUid = firebaseUser?.uid || '';
@@ -152,27 +174,79 @@ export const SocialProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const nowMs = Date.now();
 
   const players: CombinedPlayerEntry[] = useMemo(() => {
-    return Object.values(store.playerProfiles)
-      .filter((p) => p.uid !== myUid)
-      .map((p) => {
-        const pres = store.presence[p.uid] || null;
-        const pairId = myUid ? pairIdForUids(myUid, p.uid) : '';
+    const realProfiles = Object.values(store.playerProfiles).filter((p) => p.uid !== myUid);
+    const seenNames = new Set<string>([
+      myName.trim().toLowerCase(),
+      ...realProfiles.map((p) => p.displayName.trim().toLowerCase()),
+    ]);
+
+    const realEntries: CombinedPlayerEntry[] = realProfiles.map((p) => {
+      const pres = store.presence[p.uid] || null;
+      const pairId = myUid ? pairIdForUids(myUid, p.uid) : '';
+      const friendship = pairId ? store.friendships[pairId] || null : null;
+      return {
+        uid: p.uid,
+        playerId: p.playerId,
+        displayName: p.displayName,
+        avatarUrl: p.avatarUrl,
+        gamesWon: p.gamesWon || 0,
+        totalGames: p.totalGames || 0,
+        kycStatus: p.kycStatus,
+        presence: pres,
+        isOnline: isPresenceOnline(pres, nowMs),
+        friendship,
+      };
+    });
+
+    const aiConfig = normalizeAiConfig(store.aiConfig);
+    const virtualEntries: CombinedPlayerEntry[] = [];
+    if (aiConfig.aiEnabled) {
+      const timeSlot = Math.floor(nowMs / 180000);
+      aiConfig.roster.forEach((persona, idx) => {
+        if (!persona.enabled) return;
+        const normName = persona.name.trim().toLowerCase();
+        if (seenNames.has(normName)) return;
+        seenNames.add(normName);
+
+        const uid = `virtual_${persona.id}`;
+        const playerId = contenderPlayerId(persona.id);
+        const h = stableMixRank(persona.id);
+        const totalGames = 16 + (h % 34);
+        const winRatio = Math.min(0.76, Math.max(0.42, 0.48 + (persona.rating - 1850) / 550));
+        const gamesWon = Math.max(4, Math.min(totalGames - 2, Math.round(totalGames * winRatio)));
+        const inGame = (idx + timeSlot) % 4 === 0;
+        const gameType = VIRTUAL_GAMES[(h + timeSlot) % VIRTUAL_GAMES.length];
+        const pairId = myUid ? pairIdForUids(myUid, uid) : '';
         const friendship = pairId ? store.friendships[pairId] || null : null;
-        return {
-          uid: p.uid,
-          playerId: p.playerId,
-          displayName: p.displayName,
-          avatarUrl: p.avatarUrl,
-          gamesWon: p.gamesWon || 0,
-          totalGames: p.totalGames || 0,
-          kycStatus: p.kycStatus,
-          presence: pres,
-          isOnline: isPresenceOnline(pres, nowMs),
+
+        virtualEntries.push({
+          uid,
+          playerId,
+          displayName: persona.name,
+          gamesWon,
+          totalGames,
+          kycStatus: 'Approved',
+          presence: {
+            uid,
+            playerId,
+            displayName: persona.name,
+            status: inGame ? 'in_game' : 'online',
+            currentGameType: inGame ? gameType : undefined,
+            lastSeenMs: nowMs,
+          },
+          isOnline: true,
           friendship,
-        };
-      })
-      .sort((a, b) => Number(b.isOnline) - Number(a.isOnline) || b.gamesWon - a.gamesWon);
-  }, [store.playerProfiles, store.presence, store.friendships, myUid, nowMs]);
+        });
+      });
+    }
+
+    return [...realEntries, ...virtualEntries].sort(
+      (a, b) =>
+        Number(b.isOnline) - Number(a.isOnline) ||
+        stableMixRank(a.uid) - stableMixRank(b.uid) ||
+        a.displayName.localeCompare(b.displayName)
+    );
+  }, [store.playerProfiles, store.presence, store.friendships, store.aiConfig, myUid, myName, nowMs]);
 
   const onlinePlayers = useMemo(() => players.filter((p) => p.isOnline), [players]);
   const offlinePlayers = useMemo(() => players.filter((p) => !p.isOnline), [players]);
@@ -222,7 +296,13 @@ export const SocialProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const sendFriendRequest = useCallback(
     async (target: { uid: string; displayName: string; playerId: string }) => {
       if (!myUid) return;
-      await sendFriendRequestApi({ myUid, myName, myPlayerId, target });
+      const record = await sendFriendRequestApi({ myUid, myName, myPlayerId, target });
+      if (target.uid.startsWith('virtual_')) {
+        const t = window.setTimeout(() => {
+          void respondFriendRequestApi(record.pairId, 'accept');
+        }, 900);
+        timersRef.current.push(t);
+      }
     },
     [myUid, myName, myPlayerId]
   );
@@ -239,15 +319,81 @@ export const SocialProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     await respondFriendRequestApi(pairId, 'remove');
   }, []);
 
-  const loadDirectChat = useCallback(async (targetUid: string) => {
-    if (!myUid) return;
-    await fetchDirectChatHistoryApi(pairIdForUids(myUid, targetUid));
-  }, [myUid]);
+  const loadDirectChat = useCallback(
+    async (targetUid: string) => {
+      if (!myUid) return;
+      await fetchDirectChatHistoryApi(pairIdForUids(myUid, targetUid));
+    },
+    [myUid]
+  );
 
   const sendDirectMessage = useCallback(
     async (targetUid: string, text: string) => {
       if (!myUid || !text.trim()) return;
       await sendDirectMessageApi({ myUid, myName, targetUid, text });
+
+      if (targetUid.startsWith('virtual_')) {
+        const aiConfig = normalizeAiConfig(getStore().aiConfig);
+        const persona = aiConfig.roster.find((p) => `virtual_${p.id}` === targetUid);
+        if (!persona || !persona.enabled || !aiConfig.aiEnabled || !aiConfig.aiChatEnabled) return;
+
+        const pairId = pairIdForUids(myUid, targetUid);
+        const historySnapshot = (getStore().directMessages[pairId] || []).slice(-10);
+
+        const t1 = window.setTimeout(() => {
+          setTypingByPairId((prev) => ({
+            ...prev,
+            [pairId]: [{ uid: targetUid, senderName: persona.name, senderGender: persona.gender }],
+          }));
+
+          void requestSmartContenderReply({
+            persona,
+            senderName: myName,
+            text: text.trim(),
+            context: 'lobby',
+            history: historySnapshot.map((m) => ({
+              senderName: m.senderName,
+              text: m.text,
+              isSelf: m.senderUid === targetUid,
+            })),
+          }).then((replyText) => {
+            const delayMs = replyText ? Math.min(1400, Math.max(650, replyText.length * 16)) : 0;
+            const t2 = window.setTimeout(() => {
+              setTypingByPairId((prev) => {
+                const next = { ...prev };
+                delete next[pairId];
+                return next;
+              });
+              if (!replyText) return;
+              const s = getStore();
+              const participants: [string, string] =
+                myUid < targetUid ? [myUid, targetUid] : [targetUid, myUid];
+              const aiMsg: DirectMessageRecord = {
+                messageId: `dm_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                pairId,
+                participantUids: participants,
+                senderUid: targetUid,
+                senderName: persona.name,
+                text: replyText,
+                createdAt: Date.now(),
+              };
+              const existing = s.directMessages[pairId] || [];
+              s.directMessages[pairId] = [...existing.slice(-79), aiMsg];
+              s.directThreads[pairId] = {
+                pairId,
+                participantUids: participants,
+                lastMessageText: aiMsg.text,
+                lastSenderUid: aiMsg.senderUid,
+                lastSenderName: aiMsg.senderName,
+                updatedAtMs: Date.now(),
+              };
+              notifyStore();
+            }, delayMs);
+            timersRef.current.push(t2);
+          });
+        }, 320);
+        timersRef.current.push(t1);
+      }
     },
     [myUid, myName]
   );
@@ -278,6 +424,20 @@ export const SocialProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               maxPlayers: params.maxPlayers,
               entryFeeUgx: params.entryFeeUgx,
             });
+
+      if (params.toUid.startsWith('virtual_')) {
+        const aiConfig = normalizeAiConfig(getStore().aiConfig);
+        const persona = aiConfig.roster.find((p) => `virtual_${p.id}` === params.toUid);
+        if (persona && !room.aiSeats.some((s) => s.uid === persona.id)) {
+          room.aiSeats = [
+            ...room.aiSeats,
+            { uid: persona.id, displayName: persona.name, gender: persona.gender },
+          ];
+          room.updatedAt = Date.now();
+          notifyStore();
+        }
+      }
+
       const invite: GameInviteRecord = {
         inviteId: `inv_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         fromUid: myUid,
@@ -296,6 +456,14 @@ export const SocialProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         createdAtMs: Date.now(),
       };
       await sendPlayInviteApi(invite);
+
+      if (params.toUid.startsWith('virtual_')) {
+        const t = window.setTimeout(() => {
+          void respondToPlayInviteApi(invite.inviteId, 'accepted');
+        }, 800);
+        timersRef.current.push(t);
+      }
+
       if (params.navigateToTable) {
         navigate(`/game/${room.roomId}`);
       }
@@ -334,7 +502,7 @@ export const SocialProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         incomingPendingInvites,
         threadsByPairId: store.directThreads,
         messagesByPairId: store.directMessages,
-        typingByPairId: {},
+        typingByPairId,
         unreadSenders,
         totalUnreadChats,
         onlineCount: onlinePlayers.length,

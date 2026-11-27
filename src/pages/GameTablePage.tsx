@@ -151,6 +151,7 @@ export const GameTablePage: React.FC = () => {
         startImmediately: Boolean(cfg?.tournamentId),
         tournamentId: cfg?.tournamentId,
         tournamentMatchId: cfg?.tournamentMatchId,
+        preferredAiUids: cfg?.aiSeats?.map((s) => s.uid),
         onState: (nextState) => {
           if (!closed) {
             setGameState(nextState);

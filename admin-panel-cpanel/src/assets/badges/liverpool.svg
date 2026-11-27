@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <path d="M32 4L56 13v20c0 14-10 23-24 27C18 56 8 47 8 33V13L32 4z" fill="#C8102E" stroke="#00B2A9" stroke-width="3"/>
+  <path d="M32 14l5 9h9l-7 6 3 10-10-6-10 6 3-10-7-6h9z" fill="#FFD76A"/>
+  <text x="32" y="51" text-anchor="middle" font-family="Georgia,serif" font-size="10" font-weight="bold" fill="#FFFFFF">LIV</text>
+</svg>

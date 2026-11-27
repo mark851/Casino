@@ -146,11 +146,18 @@ export const HomePage: React.FC = () => {
       setTotalWins(list.reduce((sum, p) => sum + (p.gamesWon || 0), 0));
 
       const now = Date.now();
-      const onlineHumans = Object.values(s.presence).filter((p) => isPresenceOnline(p, now)).length;
-      const aiOnline = s.aiConfig.aiEnabled ? s.aiConfig.roster.filter((p) => p.enabled).length : 0;
+      const onlineHumanEntries = Object.values(s.presence).filter((p) => isPresenceOnline(p, now));
+      const onlineNames = new Set(
+        onlineHumanEntries.map((p) => p.displayName.trim().toLowerCase())
+      );
+      const additionalVirtualOnline = s.aiConfig.aiEnabled
+        ? s.aiConfig.roster.filter(
+            (p) => p.enabled && !onlineNames.has(p.name.trim().toLowerCase())
+          ).length
+        : 0;
       const rooms = Object.values(s.rooms).filter((r) => r.status !== 'completed');
       setLiveStats({
-        onlinePlayers: onlineHumans + aiOnline,
+        onlinePlayers: onlineHumanEntries.length + additionalVirtualOnline,
         activeRooms: rooms.length,
         activeGames: rooms.filter((r) => r.status === 'in_progress').length,
       });
