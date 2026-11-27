@@ -21,6 +21,7 @@ export interface StudioRigOptions {
   hemiIntensity?: number;
   keyIntensity?: number;
   rimIntensity?: number;
+  environmentIntensity?: number;
 }
 
 export interface StudioRig {
@@ -111,8 +112,8 @@ export function createStudioRig(container: HTMLElement, opts: StudioRigOptions):
   renderer.setSize(width, height, false);
   renderer.shadowMap.enabled = !isSoftwareGl;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = opts.toneMappingExposure ?? (opts.antiGlareBoard ? 0.98 : 1.1);
+  renderer.toneMapping = opts.antiGlareBoard ? THREE.NeutralToneMapping : THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = opts.toneMappingExposure ?? (opts.antiGlareBoard ? 0.96 : 1.1);
   renderer.domElement.style.width = '100%';
   renderer.domElement.style.height = '100%';
   renderer.domElement.style.display = 'block';
@@ -121,11 +122,14 @@ export function createStudioRig(container: HTMLElement, opts: StudioRigOptions):
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(opts.backgroundHex);
-  scene.fog = new THREE.FogExp2(opts.fogHex, opts.fogDensity);
+  if (opts.fogDensity > 0) {
+    scene.fog = new THREE.FogExp2(opts.fogHex, opts.fogDensity);
+  }
 
   const pmremGenerator = new THREE.PMREMGenerator(renderer);
   const envRenderTarget = pmremGenerator.fromScene(new RoomEnvironment(), 0.04);
   scene.environment = envRenderTarget.texture;
+  scene.environmentIntensity = opts.environmentIntensity ?? (opts.antiGlareBoard ? 0.15 : 1);
   pmremGenerator.dispose();
 
   const camera = new THREE.PerspectiveCamera(opts.fov, width / height, 0.1, 100);
@@ -143,18 +147,19 @@ export function createStudioRig(container: HTMLElement, opts: StudioRigOptions):
   controls.update();
 
   // Studio Three-Point Lighting
+  const hemiGround = opts.roomTheme === 'matatu' ? 0xc28340 : 0x082616;
   const hemi = new THREE.HemisphereLight(
-    0xfff6dc,
-    0x082616,
+    0xfffaf0,
+    hemiGround,
     opts.hemiIntensity ?? (opts.antiGlareBoard ? 0.88 : 0.78)
   );
   scene.add(hemi);
 
   const keyLight = new THREE.DirectionalLight(
-    0xfff7e2,
-    opts.keyIntensity ?? (opts.antiGlareBoard ? 1.35 : 1.8)
+    0xfffaf0,
+    opts.keyIntensity ?? (opts.antiGlareBoard ? 0.65 : 1.8)
   );
-  keyLight.position.set(6, 13, 7);
+  keyLight.position.set(2.5, 14, 3.5);
   keyLight.castShadow = !isSoftwareGl;
   keyLight.shadow.mapSize.set(isSoftwareGl ? 1024 : 2048, isSoftwareGl ? 1024 : 2048);
   keyLight.shadow.camera.near = 1;
@@ -168,7 +173,8 @@ export function createStudioRig(container: HTMLElement, opts: StudioRigOptions):
   keyLight.shadow.normalBias = 0.02;
   scene.add(keyLight);
 
-  const rimLight = new THREE.DirectionalLight(0x6ae6a8, opts.rimIntensity ?? 0.6);
+  const rimColor = opts.roomTheme === 'matatu' ? 0xfff5e4 : 0x6ae6a8;
+  const rimLight = new THREE.DirectionalLight(rimColor, opts.rimIntensity ?? 0.6);
   rimLight.position.set(-8, 7, -7);
   scene.add(rimLight);
 

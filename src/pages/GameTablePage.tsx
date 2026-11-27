@@ -673,9 +673,11 @@ export const GameTablePage: React.FC = () => {
 
       {/* Main Arena Grid */}
       <main
-        className={`relative z-10 flex-1 mx-auto w-full grid grid-cols-1 gap-6 items-start ${
+        className={`relative z-10 flex-1 mx-auto w-full grid grid-cols-1 gap-5 items-start ${
           isFullscreen
-            ? 'max-w-none px-3 sm:px-5 py-3'
+            ? 'max-w-none px-2 sm:px-3 py-2'
+            : gameState.gameType === 'matatu'
+            ? 'max-w-[1840px] px-2.5 sm:px-4 py-3 lg:grid-cols-[minmax(0,1fr)_270px]'
             : 'max-w-[1640px] p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_300px]'
         }`}
       >

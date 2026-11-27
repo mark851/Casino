@@ -2,7 +2,7 @@ import React from 'react';
 import { SUIT_SYMBOLS } from '../shared/matatuRules';
 import type { PlayingCard as PlayingCardType, Suit } from '../shared/types';
 
-export type CardDeckVariant = 'royale' | 'blitz';
+export type CardDeckVariant = 'royale' | 'blitz' | 'classic';
 
 interface PlayingCardProps {
   card?: PlayingCardType;
@@ -151,6 +151,33 @@ const CardCenterFace: React.FC<{
   const brightGold = '#FFE074';
   const robeCrimson = '#9E1B1E';
   const robeNavy = '#172554';
+
+  if (variant === 'classic') {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <svg viewBox="0 0 64 96" className="h-full w-full" aria-hidden="true">
+          <defs>
+            <linearGradient id={`classicRed_${courtUid}`} x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#F52222" />
+              <stop offset="55%" stopColor="#DC1414" />
+              <stop offset="100%" stopColor="#A60B0B" />
+            </linearGradient>
+            <linearGradient id={`classicBlack_${courtUid}`} x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#262626" />
+              <stop offset="60%" stopColor="#0D0D0D" />
+              <stop offset="100%" stopColor="#020202" />
+            </linearGradient>
+          </defs>
+          <g transform="translate(32 48) scale(2.15)">
+            <path
+              d={SUIT_PATHS[card.suit]}
+              fill={isRed ? `url(#classicRed_${courtUid})` : `url(#classicBlack_${courtUid})`}
+            />
+          </g>
+        </svg>
+      </div>
+    );
+  }
 
   if (size === 'xs' || size === 'sm') {
     return (
@@ -595,6 +622,60 @@ const CardBackArtwork: React.FC<{ size: 'xs' | 'sm' | 'md' | 'lg'; variant: Card
       ? 'rounded-[6px]'
       : 'rounded-[8px]';
 
+  if (variant === 'classic') {
+    const innerRadiusClassic =
+      size === 'xs' ? 'rounded-[2px]' : size === 'sm' ? 'rounded-[4px]' : 'rounded-[6px]';
+    return (
+      <div className="h-full w-full rounded-[inherit] bg-[#F8FAFC] p-[3px] shadow-[inset_0_1px_0_#FFFFFF]">
+        <div
+          className={`relative h-full w-full overflow-hidden ${innerRadiusClassic} border border-[#5B6878] bg-gradient-to-br from-[#8896A6] via-[#677688] to-[#4D5B6D] flex items-center justify-center`}
+        >
+          <svg viewBox="0 0 64 92" className="h-full w-full" aria-hidden="true">
+            <defs>
+              <pattern id={patternId} width="10" height="10" patternUnits="userSpaceOnUse">
+                <path
+                  d="M 5 0 Q 10 5 5 10 Q 0 5 5 0 Z"
+                  fill="none"
+                  stroke="#E2E8F0"
+                  strokeOpacity="0.45"
+                  strokeWidth="0.7"
+                />
+                <circle cx="5" cy="5" r="1.2" fill="#E2E8F0" fillOpacity="0.35" />
+              </pattern>
+            </defs>
+            <rect
+              x="2.5"
+              y="2.5"
+              width="59"
+              height="87"
+              rx="2.5"
+              fill={`url(#${patternId})`}
+              stroke="#E2E8F0"
+              strokeWidth="1.1"
+              strokeOpacity="0.85"
+            />
+            <rect
+              x="6"
+              y="6"
+              width="52"
+              height="80"
+              rx="2"
+              fill="none"
+              stroke="#CBD5E1"
+              strokeWidth="0.8"
+              strokeOpacity="0.7"
+            />
+            {/* Symmetric Bicycle-style Scrollwork Medallions */}
+            <circle cx="32" cy="27" r="10.5" fill="#5A697B" stroke="#E2E8F0" strokeWidth="1" />
+            <circle cx="32" cy="65" r="10.5" fill="#5A697B" stroke="#E2E8F0" strokeWidth="1" />
+            <circle cx="32" cy="46" r="12.5" fill="#475569" stroke="#F1F5F9" strokeWidth="1.1" />
+            <circle cx="32" cy="46" r="7.5" fill="none" stroke="#E2E8F0" strokeWidth="0.8" strokeDasharray="1.8 1.3" />
+          </svg>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={`h-full w-full rounded-[inherit] p-[3px] sm:p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] ${
@@ -718,12 +799,15 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
   }
 
   const isRed = card.suit === 'hearts' || card.suit === 'diamonds';
+  const isClassic = variant === 'classic';
   const isBlitzObsidian = variant === 'blitz' && !isRed;
   const suitTextColor = isRed
-    ? 'text-[#C81E1E]'
+    ? isClassic
+      ? 'text-[#DC1414]'
+      : 'text-[#C81E1E]'
     : isBlitzObsidian
     ? 'text-[#FFD96E]'
-    : 'text-[#0F172A]';
+    : 'text-[#111111]';
   const suitSymbol = SUIT_SYMBOLS[card.suit];
 
   const interactiveClasses = onClick
@@ -737,14 +821,20 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
   const stateClasses = selected
     ? 'ring-2 ring-[#F5B800] -translate-y-4 shadow-[0_20px_34px_rgba(0,0,0,0.75),0_0_22px_rgba(245,184,0,0.45)] border-[#F5B800]'
     : playable
-    ? 'ring-2 ring-[#7AE000] -translate-y-2 border-[#7AE000] shadow-[0_14px_26px_rgba(0,0,0,0.65),0_0_18px_rgba(122,224,0,0.34)]'
+    ? isClassic
+      ? 'ring-2 ring-[#16A34A] -translate-y-2 border-[#1F2937] shadow-[0_12px_22px_rgba(0,0,0,0.45),0_0_14px_rgba(22,163,74,0.42)]'
+      : 'ring-2 ring-[#7AE000] -translate-y-2 border-[#7AE000] shadow-[0_14px_26px_rgba(0,0,0,0.65),0_0_18px_rgba(122,224,0,0.34)]'
     : dimmed
     ? 'opacity-65 hover:opacity-95 border-[#CBD5E1] shadow-[0_8px_16px_rgba(0,0,0,0.45)]'
+    : isClassic
+    ? 'border-[#2D2D2D] shadow-[0_6px_14px_rgba(0,0,0,0.42)]'
     : isBlitzObsidian
     ? 'border-[#D4AF37]/85 shadow-[0_14px_28px_rgba(0,0,0,0.76),inset_0_1px_0_rgba(255,215,106,0.35)]'
     : 'border-[#D7CCB2] shadow-[0_12px_24px_rgba(0,0,0,0.62),0_2px_6px_rgba(0,0,0,0.38),inset_0_1px_0_rgba(255,255,255,0.95)]';
 
-  const cardBgClass = isBlitzObsidian
+  const cardBgClass = isClassic
+    ? 'bg-[#FFFFFF]'
+    : isBlitzObsidian
     ? 'bg-gradient-to-b from-[#17231C] via-[#0B120E] to-[#050806]'
     : variant === 'blitz'
     ? 'bg-gradient-to-b from-[#FFFDF7] via-[#FBF5E4] to-[#EFE2C1]'
@@ -776,16 +866,26 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
       className={`${SIZE_CLASSES[size]} ${interactiveClasses} ${stateClasses} relative ${cardBgClass} ${indexPadding} text-left transition-[transform,box-shadow,opacity] duration-150 ease-out border select-none shrink-0 ${className}`}
     >
       {/* Subtle Paper / Foil Edge Hairline */}
-      <span
-        aria-hidden="true"
-        className={`pointer-events-none absolute inset-[3px] ${innerLineRadius} border ${
-          variant === 'blitz' ? 'border-[#D4AF37]/55' : 'border-[#E5DEC9]/80'
-        }`}
-      />
+      {!isClassic && (
+        <span
+          aria-hidden="true"
+          className={`pointer-events-none absolute inset-[3px] ${innerLineRadius} border ${
+            variant === 'blitz' ? 'border-[#D4AF37]/55' : 'border-[#E5DEC9]/80'
+          }`}
+        />
+      )}
 
       {/* Top-Left Casino Index */}
       <div className={`relative z-10 flex flex-col items-center leading-none w-fit ${suitTextColor}`}>
-        <span className="font-casino font-extrabold tracking-tight text-[1.15em] leading-[0.95]">{card.rank}</span>
+        <span
+          className={`font-casino font-extrabold leading-[0.95] ${
+            isClassic && card.rank === '10'
+              ? 'tracking-[-0.09em] text-[1.02em]'
+              : 'tracking-tight text-[1.15em]'
+          }`}
+        >
+          {card.rank}
+        </span>
         <SuitVector
           suit={card.suit}
           className={
@@ -812,7 +912,15 @@ export const PlayingCard: React.FC<PlayingCardProps> = ({
         <div
           className={`absolute bottom-1.5 right-1.5 sm:bottom-2 sm:right-2 z-10 flex flex-col items-center leading-none w-fit rotate-180 ${suitTextColor}`}
         >
-          <span className="font-casino font-extrabold tracking-tight text-[1.15em] leading-[0.95]">{card.rank}</span>
+          <span
+            className={`font-casino font-extrabold leading-[0.95] ${
+              isClassic && card.rank === '10'
+                ? 'tracking-[-0.09em] text-[1.02em]'
+                : 'tracking-tight text-[1.15em]'
+            }`}
+          >
+            {card.rank}
+          </span>
           <SuitVector
             suit={card.suit}
             className={size === 'sm' ? 'h-2.5 w-2.5 mt-0.5' : size === 'lg' ? 'h-3.5 w-3.5 mt-0.5' : 'h-3 w-3 mt-0.5'}

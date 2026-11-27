@@ -3,9 +3,6 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { SUIT_LABELS, SUIT_SYMBOLS } from '../../shared/matatuRules';
 import {
-  buildLuxuryRoomEnvironment,
-  createFeltTexture,
-  createMahoganyTexture,
   createStudioRig,
   fitCameraFovForAspect,
   scheduleSoftwareGlFrame,
@@ -13,7 +10,6 @@ import {
 } from './studioScene';
 import { FullscreenToggleButton } from '../FullscreenToggleButton';
 import type { CardDeckVariant } from '../PlayingCard';
-import proBgMatatu from '../../assets/images/pro_bg_matatu_1794922549602.jpg';
 import type { PlayingCard as PlayingCardType, SanitizedGameState, Suit } from '../../shared/types';
 
 interface ThreeMatatuTableProps {
@@ -30,88 +26,6 @@ interface ThreeMatatuTableProps {
 
 const _vCamPos = new THREE.Vector3();
 const _vTarget = new THREE.Vector3();
-
-interface CanvasPipCoord {
-  x: number;
-  y: number;
-  invert?: boolean;
-}
-
-// Normalized coordinates inside inner card field (0..1 x, 0..1 y)
-const CANVAS_PIP_LAYOUTS: Record<string, CanvasPipCoord[]> = {
-  '2': [
-    { x: 0.5, y: 0.21 },
-    { x: 0.5, y: 0.79, invert: true },
-  ],
-  '3': [
-    { x: 0.5, y: 0.19 },
-    { x: 0.5, y: 0.5 },
-    { x: 0.5, y: 0.81, invert: true },
-  ],
-  '4': [
-    { x: 0.31, y: 0.21 },
-    { x: 0.69, y: 0.21 },
-    { x: 0.31, y: 0.79, invert: true },
-    { x: 0.69, y: 0.79, invert: true },
-  ],
-  '5': [
-    { x: 0.31, y: 0.21 },
-    { x: 0.69, y: 0.21 },
-    { x: 0.5, y: 0.5 },
-    { x: 0.31, y: 0.79, invert: true },
-    { x: 0.69, y: 0.79, invert: true },
-  ],
-  '6': [
-    { x: 0.31, y: 0.2 },
-    { x: 0.69, y: 0.2 },
-    { x: 0.31, y: 0.5 },
-    { x: 0.69, y: 0.5 },
-    { x: 0.31, y: 0.8, invert: true },
-    { x: 0.69, y: 0.8, invert: true },
-  ],
-  '7': [
-    { x: 0.31, y: 0.2 },
-    { x: 0.69, y: 0.2 },
-    { x: 0.5, y: 0.35 },
-    { x: 0.31, y: 0.5 },
-    { x: 0.69, y: 0.5 },
-    { x: 0.31, y: 0.8, invert: true },
-    { x: 0.69, y: 0.8, invert: true },
-  ],
-  '8': [
-    { x: 0.31, y: 0.2 },
-    { x: 0.69, y: 0.2 },
-    { x: 0.5, y: 0.35 },
-    { x: 0.31, y: 0.5 },
-    { x: 0.69, y: 0.5 },
-    { x: 0.5, y: 0.65, invert: true },
-    { x: 0.31, y: 0.8, invert: true },
-    { x: 0.69, y: 0.8, invert: true },
-  ],
-  '9': [
-    { x: 0.31, y: 0.17 },
-    { x: 0.69, y: 0.17 },
-    { x: 0.31, y: 0.39 },
-    { x: 0.69, y: 0.39 },
-    { x: 0.5, y: 0.5 },
-    { x: 0.31, y: 0.61, invert: true },
-    { x: 0.69, y: 0.61, invert: true },
-    { x: 0.31, y: 0.83, invert: true },
-    { x: 0.69, y: 0.83, invert: true },
-  ],
-  '10': [
-    { x: 0.31, y: 0.17 },
-    { x: 0.69, y: 0.17 },
-    { x: 0.5, y: 0.28 },
-    { x: 0.31, y: 0.39 },
-    { x: 0.69, y: 0.39 },
-    { x: 0.31, y: 0.61, invert: true },
-    { x: 0.69, y: 0.61, invert: true },
-    { x: 0.5, y: 0.72, invert: true },
-    { x: 0.31, y: 0.83, invert: true },
-    { x: 0.69, y: 0.83, invert: true },
-  ],
-};
 
 function traceSuitShape(ctx: CanvasRenderingContext2D, suit: Suit, size: number) {
   const s = size / 10;
@@ -170,7 +84,6 @@ function drawSuitVector(
     stroke?: string;
     lineWidth?: number;
     invert?: boolean;
-    facetRuby?: boolean;
   }
 ) {
   ctx.save();
@@ -179,17 +92,6 @@ function drawSuitVector(
   traceSuitShape(ctx, suit, size);
   ctx.fillStyle = options.fill;
   ctx.fill();
-  if (options.facetRuby && suit === 'diamonds') {
-    const s = size / 10;
-    ctx.beginPath();
-    ctx.moveTo(0, -8.6 * s);
-    ctx.lineTo(3.3 * s, 0);
-    ctx.lineTo(0, 8.6 * s);
-    ctx.lineTo(-3.3 * s, 0);
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(254, 202, 202, 0.28)';
-    ctx.fill();
-  }
   if (options.stroke && options.lineWidth) {
     traceSuitShape(ctx, suit, size);
     ctx.strokeStyle = options.stroke;
@@ -200,476 +102,400 @@ function drawSuitVector(
   ctx.restore();
 }
 
-function drawRoyalCrown(
+function drawVerticalWoodPlanks(
   ctx: CanvasRenderingContext2D,
-  cx: number,
-  cy: number,
-  scale: number
+  width: number,
+  height: number,
+  plankCount: number,
+  seedOffset = 0
 ) {
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.scale(scale, scale);
-  const crownGrad = ctx.createLinearGradient(-45, -35, 45, 25);
-  crownGrad.addColorStop(0, '#FFF6BE');
-  crownGrad.addColorStop(0.5, '#FFD76A');
-  crownGrad.addColorStop(1, '#B48218');
-  ctx.fillStyle = crownGrad;
-  ctx.strokeStyle = '#735109';
-  ctx.lineWidth = 3.5;
-  ctx.lineJoin = 'round';
-  ctx.beginPath();
-  ctx.moveTo(-42, 20);
-  ctx.lineTo(-34, -22);
-  ctx.lineTo(-15, -2);
-  ctx.lineTo(0, -34);
-  ctx.lineTo(15, -2);
-  ctx.lineTo(34, -22);
-  ctx.lineTo(42, 20);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
+  const plankW = width / plankCount;
+  const tones = ['#DC9B4D', '#D39042', '#CA8639', '#D99749', '#CE8A3E', '#D79547'];
 
-  ctx.fillStyle = '#B91C1C';
-  ctx.beginPath();
-  ctx.arc(0, 9, 5.2, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#059669';
-  ctx.beginPath();
-  ctx.arc(-20, 9, 4.2, 0, Math.PI * 2);
-  ctx.arc(20, 9, 4.2, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
+  for (let i = 0; i < plankCount; i += 1) {
+    const px = i * plankW;
+    const baseHex = tones[(i + seedOffset) % tones.length];
+    const pGrad = ctx.createLinearGradient(px, 0, px + plankW, 0);
+    pGrad.addColorStop(0, '#BC7931');
+    pGrad.addColorStop(0.06, baseHex);
+    pGrad.addColorStop(0.52, '#DE9F52');
+    pGrad.addColorStop(0.94, baseHex);
+    pGrad.addColorStop(1, '#B6732C');
+    ctx.fillStyle = pGrad;
+    ctx.fillRect(px, 0, plankW + 1, height);
+
+    // Subtle organic vertical pine/oak grain lines
+    for (let g = 0; g < 16; g += 1) {
+      const gx = px + 6 + ((g * 19 + i * 11) % Math.max(12, Math.floor(plankW - 12)));
+      const wobble = ((g + i) % 5) * 3.5 - 7;
+      ctx.strokeStyle =
+        g % 3 === 0 ? 'rgba(130, 74, 24, 0.18)' : 'rgba(255, 224, 174, 0.10)';
+      ctx.lineWidth = g % 4 === 0 ? 2.0 : 1.1;
+      ctx.beginPath();
+      ctx.moveTo(gx, 0);
+      ctx.bezierCurveTo(
+        gx + wobble,
+        height * 0.33,
+        gx - wobble,
+        height * 0.67,
+        gx + wobble * 0.5,
+        height
+      );
+      ctx.stroke();
+    }
+
+    // Occasional subtle natural wood knot
+    if ((i + seedOffset) % 3 === 1) {
+      const kx = px + plankW * 0.52;
+      const ky = height * (0.24 + ((i * 29) % 54) / 100);
+      ctx.save();
+      ctx.strokeStyle = 'rgba(128, 72, 22, 0.18)';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.ellipse(kx, ky, 6.5, 20, 0.05, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Crisp plank seam line
+    ctx.fillStyle = 'rgba(104, 58, 18, 0.32)';
+    ctx.fillRect(px, 0, 2, height);
+    ctx.fillStyle = 'rgba(255, 226, 178, 0.12)';
+    ctx.fillRect(px + 2, 0, 1.5, height);
+  }
 }
 
-function drawCourtHalfIllustration(
-  ctx: CanvasRenderingContext2D,
-  rank: 'J' | 'Q' | 'K',
-  suit: Suit,
-  boxX: number,
-  boxY: number,
-  boxW: number,
-  boxH: number,
-  mirrored: boolean,
-  isBlitzObsidian: boolean
-) {
-  const isRed = suit === 'hearts' || suit === 'diamonds';
-  const robePrimary =
-    rank === 'K'
-      ? isRed
-        ? '#9E1B1E'
-        : '#172554'
-      : rank === 'Q'
-      ? isRed
-        ? '#881337'
-        : '#0F172A'
-      : isRed
-      ? '#991B1B'
-      : '#1E3A8A';
-  const robeSecondary = rank === 'K' ? '#D97706' : rank === 'Q' ? '#B91C1C' : '#047857';
-  const foilGold = '#D4AF37';
+function createHoneyWoodBoardTexture(maxAnisotropy: number): THREE.CanvasTexture {
+  const w = 2048;
+  const h = 1360;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d')!;
 
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(boxX, boxY, boxW, boxH / 2);
-  ctx.clip();
+  drawVerticalWoodPlanks(ctx, w, h, 20, 0);
 
-  if (mirrored) {
-    ctx.translate(boxX + boxW / 2, boxY + boxH / 2);
-    ctx.rotate(Math.PI);
-    ctx.translate(-(boxX + boxW / 2), -(boxY + boxH / 2));
-  }
+  // Subtle dark outer perimeter frame matching reference screenshot side bevels (no bright center light)
+  const leftShadow = ctx.createLinearGradient(0, 0, 90, 0);
+  leftShadow.addColorStop(0, 'rgba(92, 46, 12, 0.44)');
+  leftShadow.addColorStop(1, 'rgba(92, 46, 12, 0)');
+  ctx.fillStyle = leftShadow;
+  ctx.fillRect(0, 0, 90, h);
 
-  const cx = boxX + boxW / 2;
-  const halfBottom = boxY + boxH / 2;
-  const u = boxW / 44;
+  const rightShadow = ctx.createLinearGradient(w - 90, 0, w, 0);
+  rightShadow.addColorStop(0, 'rgba(92, 46, 12, 0)');
+  rightShadow.addColorStop(1, 'rgba(92, 46, 12, 0.44)');
+  ctx.fillStyle = rightShadow;
+  ctx.fillRect(w - 90, 0, 90, h);
 
-  // Tapestry Backdrop
-  ctx.fillStyle = isBlitzObsidian ? '#101C16' : '#FCF3DB';
-  ctx.fillRect(boxX, boxY, boxW, boxH / 2);
-  ctx.fillStyle = isBlitzObsidian ? 'rgba(255,215,106,0.06)' : 'rgba(180,130,30,0.08)';
-  ctx.beginPath();
-  ctx.arc(cx, boxY + 18 * u, 16 * u, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Royal Robe & Shoulders
-  ctx.fillStyle = robePrimary;
-  ctx.strokeStyle = foilGold;
-  ctx.lineWidth = 3.2;
-  ctx.beginPath();
-  ctx.moveTo(boxX + 1.5 * u, halfBottom);
-  ctx.bezierCurveTo(boxX + 3 * u, halfBottom - 13 * u, boxX + 14 * u, halfBottom - 14 * u, cx, halfBottom - 13.5 * u);
-  ctx.bezierCurveTo(boxX + 30 * u, halfBottom - 14 * u, boxX + 41 * u, halfBottom - 13 * u, boxX + 42.5 * u, halfBottom);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Ermine Collar
-  ctx.fillStyle = '#FFFDF5';
-  ctx.strokeStyle = foilGold;
-  ctx.lineWidth = 2.4;
-  ctx.beginPath();
-  ctx.moveTo(cx - 11 * u, halfBottom - 11.2 * u);
-  ctx.quadraticCurveTo(cx, halfBottom - 8.2 * u, cx + 11 * u, halfBottom - 11.2 * u);
-  ctx.lineTo(cx + 8.5 * u, halfBottom - 6 * u);
-  ctx.quadraticCurveTo(cx, halfBottom - 4.5 * u, cx - 8.5 * u, halfBottom - 6 * u);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Ermine spots + Golden Tunic Sash
-  ctx.fillStyle = '#1F2937';
-  for (const sx of [-6.5, 0, 6.5]) {
-    ctx.beginPath();
-    ctx.arc(cx + sx * u, halfBottom - 8.2 * u, 0.75 * u, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.fillStyle = robeSecondary;
-  ctx.beginPath();
-  ctx.moveTo(cx - 7.5 * u, halfBottom);
-  ctx.lineTo(cx - 5.2 * u, halfBottom - 6.5 * u);
-  ctx.lineTo(cx, halfBottom - 2 * u);
-  ctx.lineTo(cx + 5.2 * u, halfBottom - 6.5 * u);
-  ctx.lineTo(cx + 7.5 * u, halfBottom);
-  ctx.closePath();
-  ctx.fill();
-
-  // Sceptre / Royal Staff
-  ctx.strokeStyle = foilGold;
-  ctx.lineWidth = 4.6;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(boxX + 7.2 * u, boxY + 9.5 * u);
-  ctx.lineTo(boxX + 5.6 * u, halfBottom - 0.5 * u);
-  ctx.stroke();
-  ctx.fillStyle = '#FFE27A';
-  ctx.strokeStyle = '#78530A';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(boxX + 7.2 * u, boxY + 8.5 * u, 2.2 * u, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  // Hair Locks
-  ctx.fillStyle = rank === 'Q' ? '#451A03' : rank === 'K' ? '#78350F' : '#292524';
-  ctx.beginPath();
-  ctx.arc(cx, boxY + 18.5 * u, 7.6 * u, Math.PI, 0);
-  ctx.lineTo(cx + 7.8 * u, boxY + 25.5 * u);
-  ctx.lineTo(cx - 7.8 * u, boxY + 25.5 * u);
-  ctx.closePath();
-  ctx.fill();
-
-  // Head & Facial Features
-  ctx.fillStyle = '#F2C794';
-  ctx.strokeStyle = '#7A4E24';
-  ctx.lineWidth = 2.4;
-  ctx.beginPath();
-  ctx.ellipse(cx, boxY + 20.5 * u, 5.4 * u, 6.0 * u, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  // Eyes & Brows
-  ctx.fillStyle = '#1F2937';
-  ctx.beginPath();
-  ctx.arc(cx - 2.0 * u, boxY + 19.6 * u, 0.72 * u, 0, Math.PI * 2);
-  ctx.arc(cx + 2.0 * u, boxY + 19.6 * u, 0.72 * u, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.strokeStyle = '#451A03';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(cx - 3.3 * u, boxY + 18 * u);
-  ctx.quadraticCurveTo(cx - 2 * u, boxY + 17.3 * u, cx - 0.9 * u, boxY + 18 * u);
-  ctx.moveTo(cx + 0.9 * u, boxY + 18 * u);
-  ctx.quadraticCurveTo(cx + 2 * u, boxY + 17.3 * u, cx + 3.3 * u, boxY + 18 * u);
-  ctx.stroke();
-
-  if (rank === 'K') {
-    ctx.fillStyle = '#5C2D0C';
-    ctx.beginPath();
-    ctx.moveTo(cx - 4.9 * u, boxY + 22.2 * u);
-    ctx.bezierCurveTo(cx - 4.4 * u, boxY + 26.8 * u, cx - 2 * u, boxY + 28 * u, cx, boxY + 28.2 * u);
-    ctx.bezierCurveTo(cx + 2 * u, boxY + 28 * u, cx + 4.4 * u, boxY + 26.8 * u, cx + 4.9 * u, boxY + 22.2 * u);
-    ctx.quadraticCurveTo(cx, boxY + 23.6 * u, cx - 4.9 * u, boxY + 22.2 * u);
-    ctx.fill();
-  } else if (rank === 'Q') {
-    ctx.strokeStyle = '#B91C1C';
-    ctx.lineWidth = 2.6;
-    ctx.beginPath();
-    ctx.moveTo(cx - 1.6 * u, boxY + 23.8 * u);
-    ctx.quadraticCurveTo(cx, boxY + 24.8 * u, cx + 1.6 * u, boxY + 23.8 * u);
-    ctx.stroke();
-  } else {
-    ctx.strokeStyle = '#3B1A06';
-    ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    ctx.moveTo(cx - 2.3 * u, boxY + 23.2 * u);
-    ctx.quadraticCurveTo(cx, boxY + 22.4 * u, cx + 2.3 * u, boxY + 23.2 * u);
-    ctx.stroke();
-  }
-
-  // Crown / Tiara / Cap
-  if (rank === 'K' || rank === 'Q') {
-    drawRoyalCrown(ctx, cx, boxY + 11.8 * u, 0.21 * u);
-  } else {
-    ctx.fillStyle = robePrimary;
-    ctx.strokeStyle = foilGold;
-    ctx.lineWidth = 2.8;
-    ctx.beginPath();
-    ctx.moveTo(cx - 8.5 * u, boxY + 15.2 * u);
-    ctx.quadraticCurveTo(cx, boxY + 6 * u, cx + 8.5 * u, boxY + 15.2 * u);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    ctx.strokeStyle = '#FFD76A';
-    ctx.lineWidth = 4.2;
-    ctx.beginPath();
-    ctx.moveTo(cx - 8.5 * u, boxY + 14.5 * u);
-    ctx.lineTo(cx + 8.5 * u, boxY + 14.5 * u);
-    ctx.stroke();
-  }
-
-  // Corner suit pip inside frame
-  drawSuitVector(ctx, suit, boxX + boxW - 5.5 * u, boxY + 6.5 * u, 5.2 * u, {
-    fill: isRed ? '#B91C1C' : isBlitzObsidian ? '#FFD76A' : '#111827',
-  });
-
-  ctx.restore();
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.anisotropy = maxAnisotropy || 1;
+  return tex;
 }
 
-function createCardFaceTexture(
-  card: PlayingCardType,
+function createMatatuPlaqueTexture(
   maxAnisotropy: number,
-  playableHighlight: boolean,
   variant: CardDeckVariant
 ): THREE.CanvasTexture {
   const w = 1024;
-  const h = 1440;
+  const h = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d')!;
+
+  // Exact same honey-wood tones & vertical plank width as the main board
+  drawVerticalWoodPlanks(ctx, w, h, 7, 0);
+
+  // Clean subtle carved border matching the raised wooden plaque without shifting board color
+  ctx.strokeStyle = variant === 'blitz' ? 'rgba(218, 158, 42, 0.72)' : 'rgba(116, 66, 20, 0.45)';
+  ctx.lineWidth = variant === 'blitz' ? 7 : 5;
+  ctx.strokeRect(8, 8, w - 16, h - 16);
+
+  // Subtle carved / debossed "MATATU" lettering in the center
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = 'bold 128px "Trebuchet MS", Georgia, sans-serif';
+
+  ctx.fillStyle = 'rgba(255, 224, 178, 0.35)';
+  ctx.fillText('MATATU', w / 2, h / 2 + 3);
+
+  ctx.fillStyle = 'rgba(126, 72, 24, 0.65)';
+  ctx.fillText('MATATU', w / 2, h / 2);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.anisotropy = maxAnisotropy || 1;
+  return tex;
+}
+
+function createFourSuitsPadTexture(maxAnisotropy: number, activeSuit: Suit): THREE.CanvasTexture {
+  const S = 768;
+  const canvas = document.createElement('canvas');
+  canvas.width = S;
+  canvas.height = S;
+  const ctx = canvas.getContext('2d')!;
+
+  // Warm frosted parchment panel matching the left suit pad in the reference image
+  const bg = ctx.createLinearGradient(0, 0, S, S);
+  bg.addColorStop(0, '#EFE0CA');
+  bg.addColorStop(0.55, '#E8D5BA');
+  bg.addColorStop(1, '#DEC7A6');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, S, S);
+
+  ctx.strokeStyle = 'rgba(176, 140, 96, 0.5)';
+  ctx.lineWidth = 10;
+  ctx.strokeRect(12, 12, S - 24, S - 24);
+
+  const slots: Array<{ suit: Suit; x: number; y: number; isRed: boolean }> = [
+    { suit: 'hearts', x: S * 0.28, y: S * 0.28, isRed: true },
+    { suit: 'clubs', x: S * 0.72, y: S * 0.28, isRed: false },
+    { suit: 'spades', x: S * 0.28, y: S * 0.72, isRed: false },
+    { suit: 'diamonds', x: S * 0.72, y: S * 0.72, isRed: true },
+  ];
+
+  slots.forEach(({ suit, x, y, isRed }) => {
+    const isActive = suit === activeSuit;
+
+    if (isActive) {
+      const glow = ctx.createRadialGradient(x, y, 22, x, y, 165);
+      glow.addColorStop(0, isRed ? 'rgba(239, 68, 68, 0.28)' : 'rgba(245, 158, 11, 0.34)');
+      glow.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(x, y, 165, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = isRed ? 'rgba(220, 38, 38, 0.55)' : 'rgba(180, 120, 20, 0.65)';
+      ctx.lineWidth = 7;
+      ctx.beginPath();
+      ctx.arc(x, y, 134, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    const grad = ctx.createLinearGradient(x, y - 100, x, y + 100);
+    if (isRed) {
+      grad.addColorStop(0, '#FA2828');
+      grad.addColorStop(0.55, '#DC1212');
+      grad.addColorStop(1, '#9E0808');
+    } else {
+      grad.addColorStop(0, '#242424');
+      grad.addColorStop(0.6, '#0C0C0C');
+      grad.addColorStop(1, '#020202');
+    }
+
+    drawSuitVector(ctx, suit, x, y, isActive ? 132 : 118, {
+      fill: grad,
+    });
+  });
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.anisotropy = maxAnisotropy || 1;
+  return tex;
+}
+
+function createClassicCardFaceTexture(
+  card: PlayingCardType,
+  maxAnisotropy: number,
+  playableHighlight: boolean
+): THREE.CanvasTexture {
+  const w = 768;
+  const h = 1080;
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext('2d')!;
 
   const isRed = card.suit === 'hearts' || card.suit === 'diamonds';
-  const isBlitz = variant === 'blitz';
-  const isBlitzObsidian = isBlitz && !isRed;
-  const foilGold = isBlitz ? '#E6B840' : '#D4AF37';
-  const ink = isRed ? '#C81E1E' : isBlitzObsidian ? '#FFD86B' : '#0F172A';
-  const pipFill = isRed ? (isBlitz ? '#D01920' : '#B91C1C') : isBlitzObsidian ? '#0C140F' : '#111827';
+  const inkColor = isRed ? '#DC1414' : '#111111';
 
-  // Card Stock Base
-  const paperGrad = ctx.createLinearGradient(0, 0, w, h);
-  if (isBlitzObsidian) {
-    paperGrad.addColorStop(0, '#16241C');
-    paperGrad.addColorStop(0.5, '#0B120E');
-    paperGrad.addColorStop(1, '#040806');
-  } else if (isBlitz) {
-    paperGrad.addColorStop(0, '#FFFDF7');
-    paperGrad.addColorStop(0.55, '#FAF2DC');
-    paperGrad.addColorStop(1, '#EEDFB8');
-  } else {
-    paperGrad.addColorStop(0, '#FFFDF9');
-    paperGrad.addColorStop(0.5, '#FBF5E6');
-    paperGrad.addColorStop(1, '#F2E9D2');
-  }
-  ctx.fillStyle = paperGrad;
+  // Crisp pure white stock matching Q♦ and 4♥ in screenshot
+  ctx.fillStyle = '#FFFFFF';
   ctx.beginPath();
-  ctx.roundRect(0, 0, w, h, 56);
+  ctx.roundRect(0, 0, w, h, 44);
   ctx.fill();
 
-  // Subtle linen grain
-  ctx.strokeStyle = isBlitzObsidian ? 'rgba(255,215,106,0.03)' : 'rgba(0,0,0,0.02)';
-  ctx.lineWidth = 2;
-  for (let i = 0; i < w; i += 18) {
-    ctx.beginPath();
-    ctx.moveTo(i, 0);
-    ctx.lineTo(i, h);
-    ctx.stroke();
-  }
+  // Outer card frame border
+  ctx.lineWidth = playableHighlight ? 22 : 10;
+  ctx.strokeStyle = playableHighlight ? '#16A34A' : '#2D2D2D';
+  ctx.beginPath();
+  ctx.roundRect(10, 10, w - 20, h - 20, 38);
+  ctx.stroke();
 
-  // Outer Highlight / Gold Rim
-  ctx.lineWidth = playableHighlight ? 28 : isBlitz ? 18 : 12;
-  ctx.strokeStyle = playableHighlight ? '#9CE800' : isBlitz ? foilGold : '#D5C8AA';
-  ctx.strokeRect(24, 24, w - 48, h - 48);
-
-  // Inner Hairline Frame
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = playableHighlight
-    ? 'rgba(156,232,0,0.7)'
-    : isBlitz
-    ? 'rgba(230,184,64,0.68)'
-    : 'rgba(180,156,100,0.48)';
-  ctx.strokeRect(56, 56, w - 112, h - 112);
-
-  // Corner Rank & Vector Suit (Top-Left) — Larger high-contrast HD casino typography
-  ctx.fillStyle = ink;
-  ctx.font = 'bold 168px Georgia, serif';
+  // Top-Left Corner Rank + Mini Suit
+  ctx.fillStyle = inkColor;
+  ctx.font = 'bold 132px "Trebuchet MS", Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  ctx.fillText(card.rank, 122, 66);
-  drawSuitVector(ctx, card.suit, 122, 278, 56, {
-    fill: isRed ? '#C81E1E' : isBlitzObsidian ? '#FFD86B' : '#0F172A',
-  });
-
-  // Inverted Bottom-Right Corner
   ctx.save();
-  ctx.translate(w - 122, h - 66);
+  ctx.translate(90, 38);
+  if (card.rank === '10') ctx.scale(0.76, 1);
+  ctx.fillText(card.rank, 0, 0);
+  ctx.restore();
+  drawSuitVector(ctx, card.suit, 90, 208, 42, { fill: inkColor });
+
+  // Bottom-Right Inverted Corner Rank + Mini Suit
+  ctx.save();
+  ctx.translate(w - 90, h - 38);
   ctx.rotate(Math.PI);
-  ctx.fillStyle = ink;
-  ctx.font = 'bold 168px Georgia, serif';
+  ctx.fillStyle = inkColor;
+  ctx.font = 'bold 132px "Trebuchet MS", Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
+  ctx.save();
+  if (card.rank === '10') ctx.scale(0.76, 1);
   ctx.fillText(card.rank, 0, 0);
-  drawSuitVector(ctx, card.suit, 0, 212, 56, {
-    fill: isRed ? '#C81E1E' : isBlitzObsidian ? '#FFD86B' : '#0F172A',
-  });
+  ctx.restore();
+  drawSuitVector(ctx, card.suit, 0, 170, 42, { fill: inkColor });
   ctx.restore();
 
-  // Card Center Art
-  if (card.rank === 'A') {
-    const cx = w / 2;
-    const cy = h / 2 + 12;
-    if (card.suit === 'spades') {
-      ctx.strokeStyle = foilGold;
-      ctx.lineWidth = 8;
-      ctx.setLineDash([16, 12]);
-      ctx.beginPath();
-      ctx.arc(cx, cy, 246, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.setLineDash([]);
+  // Single Large Glossy Centered Suit Emblem matching A♥, Q♦, 4♥, 4♦
+  const centerGrad = ctx.createLinearGradient(w / 2, h / 2 - 180, w / 2, h / 2 + 180);
+  if (isRed) {
+    centerGrad.addColorStop(0, '#FA2525');
+    centerGrad.addColorStop(0.55, '#DC1212');
+    centerGrad.addColorStop(1, '#9E0909');
+  } else {
+    centerGrad.addColorStop(0, '#262626');
+    centerGrad.addColorStop(0.6, '#0D0D0D');
+    centerGrad.addColorStop(1, '#020202');
+  }
 
-      ctx.fillStyle = isBlitz ? '#0E1913' : '#FAF2D8';
-      ctx.strokeStyle = foilGold;
-      ctx.lineWidth = 7;
+  drawSuitVector(ctx, card.suit, w / 2, h / 2, 168, {
+    fill: centerGrad,
+  });
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.anisotropy = maxAnisotropy || 1;
+  return tex;
+}
+
+function createClassicCardBackTexture(maxAnisotropy: number): THREE.CanvasTexture {
+  const w = 768;
+  const h = 1080;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d')!;
+
+  // Clean White Outer Frame Border matching the 5 top cards & right draw deck
+  ctx.fillStyle = '#F8FAFC';
+  ctx.fillRect(0, 0, w, h);
+
+  // Thin outer card edge
+  ctx.strokeStyle = '#94A3B8';
+  ctx.lineWidth = 8;
+  ctx.strokeRect(4, 4, w - 8, h - 8);
+
+  // Slate-blue/grey inner ornamental field
+  const pad = 42;
+  const iw = w - pad * 2;
+  const ih = h - pad * 2;
+  const backGrad = ctx.createLinearGradient(pad, pad, w - pad, h - pad);
+  backGrad.addColorStop(0, '#8896A6');
+  backGrad.addColorStop(0.5, '#677688');
+  backGrad.addColorStop(1, '#4C5A6B');
+  ctx.fillStyle = backGrad;
+  ctx.beginPath();
+  ctx.roundRect(pad, pad, iw, ih, 24);
+  ctx.fill();
+
+  // Ornate Bicycle filigree diamond & petal lattice
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(pad + 14, pad + 14, iw - 28, ih - 28, 18);
+  ctx.clip();
+
+  ctx.strokeStyle = 'rgba(241, 245, 249, 0.35)';
+  ctx.lineWidth = 2.5;
+  const step = 44;
+  for (let y = pad; y < h - pad; y += step) {
+    for (let x = pad; x < w - pad; x += step) {
       ctx.beginPath();
-      ctx.arc(cx, cy, 210, 0, Math.PI * 2);
+      ctx.moveTo(x + step / 2, y + 4);
+      ctx.quadraticCurveTo(x + step - 4, y + step / 2, x + step / 2, y + step - 4);
+      ctx.quadraticCurveTo(x + 4, y + step / 2, x + step / 2, y + 4);
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(226, 232, 240, 0.25)';
+      ctx.beginPath();
+      ctx.arc(x + step / 2, y + step / 2, 4, 0, Math.PI * 2);
       ctx.fill();
-      ctx.stroke();
-
-      drawRoyalCrown(ctx, cx, cy - 262, 1.48);
-
-      drawSuitVector(ctx, 'spades', cx, cy + 6, 200, {
-        fill: '#080C0A',
-        stroke: '#F6CF5E',
-        lineWidth: 10,
-      });
-
-      // Inner Gold Filigree Scrollwork
-      ctx.strokeStyle = '#FFE074';
-      ctx.lineWidth = 5.5;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy - 104);
-      ctx.bezierCurveTo(cx - 42, cy - 52, cx - 64, cy - 12, cx - 32, cy + 32);
-      ctx.bezierCurveTo(cx - 12, cy + 52, cx, cy + 32, cx, cy + 16);
-      ctx.bezierCurveTo(cx, cy + 32, cx + 12, cy + 52, cx + 32, cy + 32);
-      ctx.bezierCurveTo(cx + 64, cy - 12, cx + 42, cy - 52, cx, cy - 104);
-      ctx.stroke();
-
-      ctx.fillStyle = isBlitz ? '#FFD76A' : '#7A5A0F';
-      ctx.font = 'bold 44px Georgia, serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(isBlitz ? 'MATATU BLITZ' : 'CASINO ROYALE', cx, cy + 286);
-    } else {
-      ctx.fillStyle = isBlitzObsidian ? '#0D1712' : '#FAF3DF';
-      ctx.strokeStyle = foilGold;
-      ctx.lineWidth = 7;
-      ctx.beginPath();
-      ctx.arc(cx, cy, 210, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      drawSuitVector(ctx, card.suit, cx, cy, 192, {
-        fill: pipFill,
-        stroke: isBlitz ? foilGold : undefined,
-        lineWidth: isBlitz ? 8 : 0,
-        facetRuby: isBlitz && isRed,
-      });
     }
-  } else if (card.rank === 'K' || card.rank === 'Q' || card.rank === 'J') {
-    const boxX = 192;
-    const boxY = 186;
-    const boxW = w - 384;
-    const boxH = h - 372;
+  }
+  ctx.restore();
 
-    drawCourtHalfIllustration(ctx, card.rank, card.suit, boxX, boxY, boxW, boxH, false, isBlitzObsidian);
-    drawCourtHalfIllustration(ctx, card.rank, card.suit, boxX, boxY, boxW, boxH, true, isBlitzObsidian);
+  // Double white inner filigree border
+  ctx.strokeStyle = 'rgba(248, 250, 252, 0.85)';
+  ctx.lineWidth = 8;
+  ctx.beginPath();
+  ctx.roundRect(pad + 16, pad + 16, iw - 32, ih - 32, 16);
+  ctx.stroke();
 
-    // Center dividing sash + diamond seal
-    ctx.strokeStyle = foilGold;
-    ctx.lineWidth = 8;
+  ctx.strokeStyle = 'rgba(226, 232, 240, 0.65)';
+  ctx.lineWidth = 3.5;
+  ctx.beginPath();
+  ctx.roundRect(pad + 34, pad + 34, iw - 68, ih - 68, 12);
+  ctx.stroke();
+
+  // Twin Top & Bottom Scroll Medallions + Center Bicycle Rosette
+  for (const cy of [h * 0.29, h * 0.71]) {
+    ctx.fillStyle = '#5B6A7C';
+    ctx.strokeStyle = '#E2E8F0';
+    ctx.lineWidth = 6;
     ctx.beginPath();
-    ctx.moveTo(boxX, h / 2);
-    ctx.lineTo(boxX + boxW, h / 2);
-    ctx.stroke();
-
-    ctx.fillStyle = '#FFD76A';
-    ctx.strokeStyle = '#735109';
-    ctx.lineWidth = 4.5;
-    ctx.beginPath();
-    ctx.moveTo(w / 2, h / 2 - 38);
-    ctx.lineTo(w / 2 + 38, h / 2);
-    ctx.lineTo(w / 2, h / 2 + 38);
-    ctx.lineTo(w / 2 - 38, h / 2);
-    ctx.closePath();
+    ctx.arc(w / 2, cy, 94, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
-    // Ornate Gold Court Frame
-    ctx.strokeStyle = foilGold;
-    ctx.lineWidth = 11;
-    ctx.strokeRect(boxX, boxY, boxW, boxH);
-    ctx.strokeStyle = 'rgba(212,175,55,0.5)';
-    ctx.lineWidth = 4.5;
-    ctx.strokeRect(boxX - 18, boxY - 18, boxW + 36, boxH + 36);
-  } else {
-    // 2–10 Real Pip Matrix
-    const fieldX = 188;
-    const fieldY = 166;
-    const fieldW = w - 376;
-    const fieldH = h - 332;
-    const coords = CANVAS_PIP_LAYOUTS[card.rank] || [{ x: 0.5, y: 0.5 }];
-    const pipSize =
-      card.rank === '9' || card.rank === '10' ? 74 : card.rank === '7' || card.rank === '8' ? 84 : 102;
+    ctx.strokeStyle = 'rgba(241, 245, 249, 0.68)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(w / 2, cy, 62, 0, Math.PI * 2);
+    ctx.stroke();
+  }
 
-    if (isBlitz) {
-      if (isRed) {
-        ctx.save();
-        ctx.strokeStyle = 'rgba(212,175,55,0.58)';
-        ctx.lineWidth = 4.5;
-        ctx.setLineDash([12, 10]);
-        ctx.beginPath();
-        ctx.arc(w / 2, h / 2 + 40, 128, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
-      } else {
-        // Blitz electric gold starburst behind black suit pips
-        ctx.save();
-        ctx.translate(w / 2, h / 2);
-        ctx.fillStyle = 'rgba(255, 224, 114, 0.9)';
-        ctx.beginPath();
-        ctx.moveTo(0, -108);
-        ctx.lineTo(19, -20);
-        ctx.lineTo(108, 0);
-        ctx.lineTo(19, 20);
-        ctx.lineTo(0, 108);
-        ctx.lineTo(-19, 20);
-        ctx.lineTo(-108, 0);
-        ctx.lineTo(-19, -20);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
-      }
-    }
+  ctx.fillStyle = '#475569';
+  ctx.strokeStyle = '#F8FAFC';
+  ctx.lineWidth = 8;
+  ctx.beginPath();
+  ctx.arc(w / 2, h / 2, 118, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
 
-    for (const p of coords) {
-      drawSuitVector(ctx, card.suit, fieldX + p.x * fieldW, fieldY + p.y * fieldH, pipSize, {
-        fill: pipFill,
-        stroke: isBlitz ? (isRed ? '#D99B26' : '#F3CA52') : undefined,
-        lineWidth: isBlitz ? (isRed ? 5.5 : 8.5) : 0,
-        invert: p.invert,
-        facetRuby: isBlitz && isRed,
-      });
-    }
+  ctx.strokeStyle = '#E2E8F0';
+  ctx.lineWidth = 4;
+  ctx.setLineDash([12, 8]);
+  ctx.beginPath();
+  ctx.arc(w / 2, h / 2, 78, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Fine inner spoke star
+  ctx.strokeStyle = 'rgba(248, 250, 252, 0.75)';
+  ctx.lineWidth = 3.5;
+  for (let a = 0; a < 8; a += 1) {
+    const ang = (a * Math.PI) / 4;
+    ctx.beginPath();
+    ctx.moveTo(w / 2 + Math.cos(ang) * 18, h / 2 + Math.sin(ang) * 18);
+    ctx.lineTo(w / 2 + Math.cos(ang) * 66, h / 2 + Math.sin(ang) * 66);
+    ctx.stroke();
   }
 
   const tex = new THREE.CanvasTexture(canvas);
@@ -681,561 +507,287 @@ function createCardFaceTexture(
   return tex;
 }
 
-function createCardBackTexture(maxAnisotropy: number, variant: CardDeckVariant): THREE.CanvasTexture {
-  const w = 1024;
-  const h = 1440;
+function drawFivePointStar(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  outerR: number,
+  innerR: number
+) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i += 1) {
+    const r = i % 2 === 0 ? outerR : innerR;
+    const ang = -Math.PI / 2 + (i * Math.PI) / 5;
+    const x = cx + Math.cos(ang) * r;
+    const y = cy + Math.sin(ang) * r;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
+function createUsaFlagCardBackTexture(maxAnisotropy: number): THREE.CanvasTexture {
+  const w = 768;
+  const h = 1080;
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext('2d')!;
-  const isBlitz = variant === 'blitz';
 
-  ctx.fillStyle = isBlitz ? '#06100B' : '#073b22';
-  ctx.fillRect(0, 0, w, h);
+  // Clean silver-white outer card stock edge
+  ctx.fillStyle = '#F8FAFC';
+  ctx.beginPath();
+  ctx.roundRect(0, 0, w, h, 40);
+  ctx.fill();
 
-  // Fine gold diamond guilloche lattice
-  ctx.strokeStyle = isBlitz ? 'rgba(255, 215, 106, 0.20)' : 'rgba(255, 215, 106, 0.14)';
-  ctx.lineWidth = 3;
-  for (let i = -h; i < w + h; i += 44) {
+  ctx.strokeStyle = '#94A3B8';
+  ctx.lineWidth = 8;
+  ctx.beginPath();
+  ctx.roundRect(4, 4, w - 8, h - 8, 38);
+  ctx.stroke();
+
+  const pad = 22;
+  const fw = w - pad * 2;
+  const fh = h - pad * 2;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(pad, pad, fw, fh, 26);
+  ctx.clip();
+
+  // 13 alternating Red (#B22234) and White (#FFFFFF) horizontal stripes
+  const stripeH = fh / 13;
+  for (let s = 0; s < 13; s += 1) {
+    ctx.fillStyle = s % 2 === 0 ? '#B22234' : '#FFFFFF';
+    ctx.fillRect(pad, pad + s * stripeH, fw, stripeH + 1);
+  }
+
+  // Deep Navy Blue Union Canton (#0A3161) top-left spanning 7 stripes tall
+  const cantonW = fw * 0.48;
+  const cantonH = stripeH * 7;
+  ctx.fillStyle = '#0A3161';
+  ctx.fillRect(pad, pad, cantonW, cantonH);
+
+  // Crisp White 5-Pointed Stars Grid inside Canton
+  ctx.fillStyle = '#FFFFFF';
+  const rows = 9;
+  for (let r = 0; r < rows; r += 1) {
+    const isEven = r % 2 === 0;
+    const cols = isEven ? 6 : 5;
+    const cy = pad + ((r + 0.85) * cantonH) / (rows + 0.7);
+    for (let c = 0; c < cols; c += 1) {
+      const cx =
+        pad +
+        ((isEven ? c + 0.75 : c + 1.25) * cantonW) / (isEven ? 6.5 : 6.5);
+      drawFivePointStar(ctx, cx, cy, 17, 7);
+    }
+  }
+
+  // Subtle top bevel sheen inside flag edge
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+  ctx.lineWidth = 6;
+  ctx.strokeRect(pad + 3, pad + 3, fw - 6, fh - 6);
+  ctx.restore();
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.anisotropy = maxAnisotropy || 1;
+  return tex;
+}
+
+function createUgandaFlagCardBackTexture(maxAnisotropy: number): THREE.CanvasTexture {
+  const w = 768;
+  const h = 1080;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d')!;
+
+  ctx.fillStyle = '#F8FAFC';
+  ctx.beginPath();
+  ctx.roundRect(0, 0, w, h, 40);
+  ctx.fill();
+
+  const pad = 16;
+  const fw = w - pad * 2;
+  const fh = h - pad * 2;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(pad, pad, fw, fh, 26);
+  ctx.clip();
+
+  const bandColors = ['#0D0D0D', '#FCDC04', '#D90000', '#0D0D0D', '#FCDC04', '#D90000'];
+  const bandH = fh / 6;
+  bandColors.forEach((col, idx) => {
+    ctx.fillStyle = col;
+    ctx.fillRect(pad, pad + idx * bandH, fw, bandH + 1);
+  });
+
+  // White Center Medallion with Crested Crane Emblem
+  const cx = w / 2;
+  const cy = h / 2;
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 134, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  // Simplified crisp Crested Crane silhouette
+  ctx.fillStyle = '#111111';
+  ctx.beginPath();
+  ctx.ellipse(cx + 8, cy + 12, 42, 26, -0.25, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = '#111111';
+  ctx.lineWidth = 14;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(cx - 24, cy + 8);
+  ctx.quadraticCurveTo(cx - 46, cy - 34, cx - 18, cy - 68);
+  ctx.stroke();
+
+  // Head & Red Wattles / Crown Crest
+  ctx.fillStyle = '#111111';
+  ctx.beginPath();
+  ctx.arc(cx - 16, cy - 70, 14, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#D90000';
+  ctx.beginPath();
+  ctx.arc(cx - 14, cy - 58, 9, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = '#FACC15';
+  ctx.lineWidth = 5;
+  for (let a = -0.7; a <= 0.3; a += 0.25) {
     ctx.beginPath();
-    ctx.moveTo(i, 0);
-    ctx.lineTo(i + h, h);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(i + h, 0);
-    ctx.lineTo(i, h);
+    ctx.moveTo(cx - 18, cy - 78);
+    ctx.lineTo(cx - 18 + Math.sin(a) * 28, cy - 78 - Math.cos(a) * 26);
     ctx.stroke();
   }
 
-  ctx.strokeStyle = '#ffd76a';
-  ctx.lineWidth = 22;
-  ctx.strokeRect(46, 46, w - 92, h - 92);
-
-  ctx.strokeStyle = isBlitz ? 'rgba(156,232,0,0.52)' : 'rgba(255,215,106,0.52)';
-  ctx.lineWidth = 7;
-  ctx.strokeRect(86, 86, w - 172, h - 172);
-
-  // Center Gold Diamond Medallion
-  ctx.fillStyle = isBlitz ? '#0C1711' : '#d4af37';
+  // Wing & Legs
+  ctx.fillStyle = '#E5E7EB';
   ctx.beginPath();
-  ctx.moveTo(w / 2, h / 2 - 205);
-  ctx.lineTo(w / 2 + 160, h / 2);
-  ctx.lineTo(w / 2, h / 2 + 205);
-  ctx.lineTo(w / 2 - 160, h / 2);
+  ctx.ellipse(cx + 12, cy + 10, 26, 14, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#D90000';
+  ctx.beginPath();
+  ctx.moveTo(cx + 38, cy + 2);
+  ctx.lineTo(cx + 68, cy + 26);
+  ctx.lineTo(cx + 34, cy + 24);
   ctx.closePath();
   ctx.fill();
-  ctx.lineWidth = 10;
-  ctx.strokeStyle = '#fff3b0';
-  ctx.stroke();
 
-  if (isBlitz) {
-    // Blitz lightning bolt + 256
-    ctx.fillStyle = '#FFD76A';
-    ctx.beginPath();
-    ctx.moveTo(w / 2 + 30, h / 2 - 110);
-    ctx.lineTo(w / 2 - 58, h / 2 + 12);
-    ctx.lineTo(w / 2 + 8, h / 2 + 12);
-    ctx.lineTo(w / 2 - 30, h / 2 + 110);
-    ctx.lineTo(w / 2 + 58, h / 2 - 12);
-    ctx.lineTo(w / 2 - 8, h / 2 - 12);
-    ctx.closePath();
-    ctx.fill();
-  } else {
-    ctx.fillStyle = '#073b22';
-    ctx.font = 'bold 88px Georgia, serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('256', w / 2, h / 2);
-  }
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = maxAnisotropy || 1;
-  return tex;
-}
-
-function createTableFeltCrestTexture(
-  maxAnisotropy: number,
-  variant: CardDeckVariant
-): THREE.CanvasTexture {
-  const S = 2048;
-  const canvas = document.createElement('canvas');
-  canvas.width = S;
-  canvas.height = S;
-  const ctx = canvas.getContext('2d')!;
-  const isBlitz = variant === 'blitz';
-
-  const grad = ctx.createRadialGradient(S / 2, S / 2, 90, S / 2, S / 2, S / 2);
-  if (isBlitz) {
-    grad.addColorStop(0, '#0C6138');
-    grad.addColorStop(0.55, '#05331E');
-    grad.addColorStop(1, '#02120A');
-  } else {
-    grad.addColorStop(0, '#117A46');
-    grad.addColorStop(0.58, '#074528');
-    grad.addColorStop(1, '#021B0F');
-  }
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, S, S);
-
-  // Subtle woven diamond damask pattern across the entire HD casino baize
-  ctx.strokeStyle = isBlitz ? 'rgba(255,215,106,0.045)' : 'rgba(255,255,255,0.032)';
-  ctx.lineWidth = 2;
-  const step = 64;
-  for (let y = 0; y < S; y += step) {
-    for (let x = 0; x < S; x += step) {
-      ctx.beginPath();
-      ctx.moveTo(x + step / 2, y + 6);
-      ctx.lineTo(x + step - 6, y + step / 2);
-      ctx.lineTo(x + step / 2, y + step - 6);
-      ctx.lineTo(x + 6, y + step / 2);
-      ctx.closePath();
-      ctx.stroke();
-    }
-  }
-
-  // Double gold inner table oval track lines
-  ctx.strokeStyle = isBlitz ? 'rgba(255,215,106,0.62)' : 'rgba(255,215,106,0.52)';
-  ctx.lineWidth = 12;
-  ctx.beginPath();
-  ctx.ellipse(S / 2, S / 2, 810, 650, 0, 0, Math.PI * 2);
-  ctx.stroke();
-
-  ctx.strokeStyle = isBlitz ? 'rgba(156,232,0,0.34)' : 'rgba(255,215,106,0.26)';
-  ctx.lineWidth = 5;
-  ctx.beginPath();
-  ctx.ellipse(S / 2, S / 2, 768, 608, 0, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // Center table medallion ring + Spade watermark
-  ctx.strokeStyle = isBlitz ? 'rgba(255,215,106,0.34)' : 'rgba(255,215,106,0.26)';
+  ctx.strokeStyle = '#111111';
   ctx.lineWidth = 7;
   ctx.beginPath();
-  ctx.arc(S / 2, S / 2, 236, 0, Math.PI * 2);
+  ctx.moveTo(cx - 2, cy + 32);
+  ctx.lineTo(cx - 8, cy + 84);
+  ctx.moveTo(cx + 16, cy + 32);
+  ctx.lineTo(cx + 20, cy + 84);
   ctx.stroke();
 
-  ctx.save();
-  ctx.globalAlpha = 0.16;
-  drawSuitVector(ctx, 'spades', S / 2, S / 2, 130, { fill: '#FFD76A' });
   ctx.restore();
-
-  // Ugandan Flag Accent Bar above title
-  const stripeW = 280;
-  const stripeH = 6;
-  const flagColors = ['#111111', '#FCDC04', '#D90000'];
-  flagColors.forEach((c, idx) => {
-    ctx.fillStyle = c;
-    ctx.fillRect(S / 2 - stripeW / 2, 214 + idx * stripeH, stripeW, stripeH);
-  });
-
-  ctx.fillStyle = 'rgba(255,222,120,0.78)';
-  ctx.font = 'bold 80px Georgia, serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(isBlitz ? 'MATATU BLITZ' : 'UGANDAN MATATU', S / 2, 294);
-
-  ctx.font = 'bold 50px Georgia, serif';
-  ctx.fillStyle = isBlitz ? 'rgba(156,232,0,0.68)' : 'rgba(255,215,106,0.58)';
-  ctx.fillText(isBlitz ? 'TURBO HIGH-ROLLER · 256' : 'CASINO ROYALE · 256', S / 2, S - 260);
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
   tex.anisotropy = maxAnisotropy || 1;
   return tex;
 }
 
-function createCasinoChipTexture(
-  maxAnisotropy: number,
-  bodyColor: string,
-  stripeColor: string,
-  topLabel: string
-): THREE.CanvasTexture {
-  const S = 512;
+function createBlitzPlaqueTexture(maxAnisotropy: number): THREE.CanvasTexture {
+  const w = 1400;
+  const h = 620;
   const canvas = document.createElement('canvas');
-  canvas.width = S;
-  canvas.height = S;
+  canvas.width = w;
+  canvas.height = h;
   const ctx = canvas.getContext('2d')!;
 
-  ctx.fillStyle = bodyColor;
-  ctx.fillRect(0, 0, S, S);
+  ctx.fillStyle = '#090505';
+  ctx.fillRect(0, 0, w, h);
 
-  // Outer dashed stripes
-  ctx.strokeStyle = stripeColor;
-  ctx.lineWidth = 44;
-  ctx.setLineDash([48, 34]);
-  ctx.beginPath();
-  ctx.arc(S / 2, S / 2, S * 0.43, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.setLineDash([]);
+  // Fiery Crimson-Red & Gold Radial Sweep across left half matching Blitz center panel
+  const redFlare = ctx.createRadialGradient(w * 0.24, h * 0.52, 20, w * 0.30, h * 0.52, w * 0.44);
+  redFlare.addColorStop(0, '#FCA5A5');
+  redFlare.addColorStop(0.18, '#EF4444');
+  redFlare.addColorStop(0.55, '#7F1D1D');
+  redFlare.addColorStop(1, 'rgba(12, 4, 4, 0)');
+  ctx.fillStyle = redFlare;
+  ctx.fillRect(0, 0, w, h);
 
-  // Gold edge ring
-  ctx.strokeStyle = '#FFD76A';
-  ctx.lineWidth = 10;
+  // Sweeping Golden-Yellow Ugandan Flare Band along Left Curve
+  const goldWave = ctx.createLinearGradient(0, 0, w * 0.25, h);
+  goldWave.addColorStop(0, '#FEF08A');
+  goldWave.addColorStop(0.5, '#FACC15');
+  goldWave.addColorStop(1, '#B91C1C');
+  ctx.fillStyle = goldWave;
   ctx.beginPath();
-  ctx.arc(S / 2, S / 2, S * 0.33, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // Center white inlay disc + Ugandan Flag Band matching the Matatu Royale icon chips
-  ctx.beginPath();
-  ctx.arc(S / 2, S / 2, S * 0.25, 0, Math.PI * 2);
-  ctx.fillStyle = '#FDF8EA';
+  ctx.moveTo(0, 0);
+  ctx.lineTo(w * 0.14, 0);
+  ctx.quadraticCurveTo(w * 0.24, h * 0.5, w * 0.18, h);
+  ctx.lineTo(0, h);
+  ctx.closePath();
   ctx.fill();
-  ctx.lineWidth = 8;
-  ctx.strokeStyle = '#D4AF37';
-  ctx.stroke();
 
-  // Ugandan Flag mini band inside bottom half of chip crest
-  ctx.save();
+  // Curved Jet-Black Glossy Left Crescent
+  ctx.fillStyle = '#040404';
   ctx.beginPath();
-  ctx.arc(S / 2, S / 2, S * 0.22, 0, Math.PI * 2);
-  ctx.clip();
-  const bandY = S / 2 + 24;
-  ['#111111', '#FCDC04', '#D90000'].forEach((c, i) => {
-    ctx.fillStyle = c;
-    ctx.fillRect(S * 0.25, bandY + i * 11, S * 0.5, 11);
-  });
-  ctx.restore();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(w * 0.04, 0);
+  ctx.quadraticCurveTo(w * 0.19, h * 0.52, w * 0.16, h);
+  ctx.lineTo(0, h);
+  ctx.closePath();
+  ctx.fill();
 
-  ctx.fillStyle = '#0F172A';
-  ctx.font = 'bold 46px Georgia, serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(topLabel, S / 2, S / 2 - 14);
+  // Subtle diagonal white glass glint on top-left corner curve matching screenshot
+  const glint = ctx.createLinearGradient(0, 0, w * 0.15, h * 0.35);
+  glint.addColorStop(0, 'rgba(255, 255, 255, 0.28)');
+  glint.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  ctx.fillStyle = glint;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(w * 0.14, 0);
+  ctx.lineTo(w * 0.08, h * 0.36);
+  ctx.lineTo(0, h * 0.24);
+  ctx.closePath();
+  ctx.fill();
+
+  // Subtle Dark Space Stardust Specks on Right Field
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+  for (let i = 0; i < 90; i += 1) {
+    const sx = w * 0.35 + ((i * 173) % (w * 0.62));
+    const sy = (i * 97) % h;
+    const r = (i % 3) * 0.6 + 0.7;
+    ctx.beginPath();
+    ctx.arc(sx, sy, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Crisp White/Silver Rounded Border Frame
+  ctx.strokeStyle = '#E2E8F0';
+  ctx.lineWidth = 10;
+  ctx.strokeRect(5, 5, w - 10, h - 10);
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
   tex.anisotropy = maxAnisotropy || 1;
   return tex;
-}
-
-function buildLatestRangeRoverSport(
-  brassMat: THREE.Material,
-  glassMat: THREE.Material,
-  wheelMat: THREE.Material,
-  headlightMat: THREE.Material,
-  trackGeo: <T extends THREE.BufferGeometry>(g: T) => T,
-  trackMat: <T extends THREE.Material>(m: T) => T
-): THREE.Group {
-  const suv = new THREE.Group();
-
-  // Signature 2025/2026 Range Rover Sport L461 SV Materials
-  const bodySilverMat = trackMat(
-    new THREE.MeshPhysicalMaterial({
-      color: 0xd8dee6, // Hakuba Silver Pearl Metallic
-      roughness: 0.18,
-      metalness: 0.58,
-      clearcoat: 0.96,
-      clearcoatRoughness: 0.08,
-    })
-  );
-  const obsidianRoofMat = trackMat(
-    new THREE.MeshPhysicalMaterial({
-      color: 0x0b0e14, // Gloss Black Contrast Floating Roof & Trim
-      roughness: 0.14,
-      metalness: 0.45,
-      clearcoat: 0.98,
-    })
-  );
-  const graphiteGrilleMat = trackMat(
-    new THREE.MeshStandardMaterial({ color: 0x1c222b, roughness: 0.42, metalness: 0.65 })
-  );
-  const copperSvMat = trackMat(
-    new THREE.MeshPhysicalMaterial({
-      color: 0xc87d4b, // Range Rover SV Satin Burnished Copper accents
-      roughness: 0.25,
-      metalness: 0.85,
-      clearcoat: 0.5,
-    })
-  );
-  const alloyMat = trackMat(
-    new THREE.MeshPhysicalMaterial({ color: 0xe5e7eb, roughness: 0.14, metalness: 0.94, clearcoat: 0.6 })
-  );
-  const bremboRedMat = trackMat(
-    new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.3, metalness: 0.3 })
-  );
-  const tailLedMat = trackMat(
-    new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xef4444, emissiveIntensity: 1.6 })
-  );
-  const plateMat = trackMat(
-    new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.3 })
-  );
-
-  // 1. Sleek L461 Lower Body & Clamshell Hood Silhouette (ExtrudeGeometry)
-  const bodyShape = new THREE.Shape();
-  bodyShape.moveTo(-0.82, 0.15);
-  bodyShape.lineTo(0.84, 0.15);
-  bodyShape.lineTo(0.88, 0.28);
-  bodyShape.lineTo(0.84, 0.39); // Crisp Range Rover vertical nose
-  bodyShape.lineTo(0.41, 0.43); // Long sculpted clamshell bonnet
-  bodyShape.lineTo(0.16, 0.61); // Sleek raked A-pillar slope
-  bodyShape.lineTo(-0.56, 0.59); // Gentle L461 fastback roofline slope
-  bodyShape.lineTo(-0.84, 0.42); // Sporty angled tailgate
-  bodyShape.lineTo(-0.86, 0.24);
-  bodyShape.closePath();
-
-  const mainShellGeo = trackGeo(
-    new THREE.ExtrudeGeometry(bodyShape, {
-      depth: 0.72,
-      bevelEnabled: true,
-      bevelThickness: 0.035,
-      bevelSize: 0.025,
-      bevelSegments: 4,
-    })
-  );
-  mainShellGeo.translate(0, 0, -0.36);
-  const mainShell = new THREE.Mesh(mainShellGeo, bodySilverMat);
-  mainShell.castShadow = true;
-  mainShell.receiveShadow = true;
-  suv.add(mainShell);
-
-  // 2. Gloss Black Contrast Floating Roof Cap + Panoramic Sunroof Glass
-  const roofShape = new THREE.Shape();
-  roofShape.moveTo(-0.58, 0.575);
-  roofShape.lineTo(0.18, 0.595);
-  roofShape.lineTo(0.13, 0.64);
-  roofShape.lineTo(-0.56, 0.625);
-  roofShape.lineTo(-0.67, 0.575);
-  roofShape.closePath();
-
-  const roofGeo = trackGeo(
-    new THREE.ExtrudeGeometry(roofShape, {
-      depth: 0.64,
-      bevelEnabled: true,
-      bevelThickness: 0.02,
-      bevelSize: 0.015,
-      bevelSegments: 3,
-    })
-  );
-  roofGeo.translate(0, 0, -0.32);
-  const roofCap = new THREE.Mesh(roofGeo, obsidianRoofMat);
-  roofCap.castShadow = true;
-  suv.add(roofCap);
-
-  // Tinted Panoramic Sunroof Glass Panel
-  const panoRoof = new THREE.Mesh(
-    trackGeo(new RoundedBoxGeometry(0.56, 0.02, 0.46, 2, 0.008)),
-    glassMat
-  );
-  panoRoof.position.set(-0.22, 0.64, 0);
-  panoRoof.rotation.z = -0.025;
-  suv.add(panoRoof);
-
-  // Roof-edge Twin Gloss Black Spoiler Lip + Shark-Fin Antenna
-  const spoiler = new THREE.Mesh(
-    trackGeo(new RoundedBoxGeometry(0.14, 0.035, 0.60, 2, 0.01)),
-    obsidianRoofMat
-  );
-  spoiler.position.set(-0.63, 0.595, 0);
-  spoiler.rotation.z = 0.16;
-  suv.add(spoiler);
-
-  const sharkFin = new THREE.Mesh(
-    trackGeo(new RoundedBoxGeometry(0.09, 0.045, 0.03, 2, 0.008)),
-    obsidianRoofMat
-  );
-  sharkFin.position.set(-0.46, 0.655, 0);
-  suv.add(sharkFin);
-
-  // 3. Flush Wrap-Around Dark Greenhouse Glass + Gloss Black Pillars (Floating Roof Signature)
-  const frontWindshield = new THREE.Mesh(
-    trackGeo(new RoundedBoxGeometry(0.035, 0.29, 0.62, 2, 0.01)),
-    glassMat
-  );
-  frontWindshield.position.set(0.30, 0.525, 0);
-  frontWindshield.rotation.z = 0.86;
-  suv.add(frontWindshield);
-
-  const sideGreenhouse = new THREE.Mesh(
-    trackGeo(new RoundedBoxGeometry(0.84, 0.165, 0.71, 2, 0.015)),
-    glassMat
-  );
-  sideGreenhouse.position.set(-0.23, 0.505, 0);
-  suv.add(sideGreenhouse);
-
-  // Gloss Black B/C/D Window Pillars
-  for (const px of [0.06, -0.25, -0.56]) {
-    const pillar = new THREE.Mesh(
-      trackGeo(new THREE.BoxGeometry(0.055, 0.17, 0.725)),
-      obsidianRoofMat
-    );
-    pillar.position.set(px, 0.505, 0);
-    suv.add(pillar);
-  }
-
-  // Rear Raked Tailgate Glass
-  const rearGlass = new THREE.Mesh(
-    trackGeo(new RoundedBoxGeometry(0.035, 0.21, 0.58, 2, 0.01)),
-    glassMat
-  );
-  rearGlass.position.set(-0.725, 0.505, 0);
-  rearGlass.rotation.z = -0.78;
-  suv.add(rearGlass);
-
-  // 4. Lower Gloss Black Rocker Skirts & Flared Wheel Arch Fenders
-  const lowerSill = new THREE.Mesh(
-    trackGeo(new RoundedBoxGeometry(1.66, 0.075, 0.78, 3, 0.015)),
-    obsidianRoofMat
-  );
-  lowerSill.position.set(0.01, 0.16, 0);
-  suv.add(lowerSill);
-
-  // Side SV Satin-Copper Fender Gill Vents & Flush Deployable Door Handles
-  for (const sz of [-0.398, 0.398]) {
-    const fenderVent = new THREE.Mesh(
-      trackGeo(new RoundedBoxGeometry(0.11, 0.042, 0.015, 2, 0.005)),
-      copperSvMat
-    );
-    fenderVent.position.set(0.36, 0.365, sz);
-    suv.add(fenderVent);
-
-    for (const hx of [0.09, -0.22]) {
-      const handle = new THREE.Mesh(
-        trackGeo(new RoundedBoxGeometry(0.075, 0.018, 0.014, 2, 0.004)),
-        obsidianRoofMat
-      );
-      handle.position.set(hx, 0.385, sz);
-      suv.add(handle);
-    }
-  }
-
-  // Sculpted Clamshell Hood Louvre Vents + Front Grille + Digital LED Headlights
-  for (const vz of [-0.18, 0.18]) {
-    const hoodVent = new THREE.Mesh(
-      trackGeo(new RoundedBoxGeometry(0.11, 0.012, 0.065, 2, 0.004)),
-      copperSvMat
-    );
-    hoodVent.position.set(0.56, 0.435, vz);
-    suv.add(hoodVent);
-  }
-
-  // Flush L461 Upper Satin Graphite Grille + Silver Frame
-  const grilleBezel = new THREE.Mesh(
-    trackGeo(new RoundedBoxGeometry(0.032, 0.095, 0.42, 2, 0.01)),
-    obsidianRoofMat
-  );
-  grilleBezel.position.set(0.875, 0.335, 0);
-  suv.add(grilleBezel);
-
-  const grilleMesh = new THREE.Mesh(
-    trackGeo(new RoundedBoxGeometry(0.036, 0.075, 0.38, 2, 0.006)),
-    graphiteGrilleMat
-  );
-  grilleMesh.position.set(0.878, 0.335, 0);
-  suv.add(grilleMesh);
-
-  // Ultra-Slim Signature L461 Digital LED Headlights
-  const drlGeo = trackGeo(new RoundedBoxGeometry(0.04, 0.036, 0.14, 2, 0.008));
-  for (const lz of [-0.285, 0.285]) {
-    const headlight = new THREE.Mesh(drlGeo, headlightMat);
-    headlight.position.set(0.875, 0.34, lz);
-    suv.add(headlight);
-  }
-
-  // Aggressive L461 Lower Triple-Blade Bumper Intakes + Front Splitter + Plate
-  const lowerIntake = new THREE.Mesh(
-    trackGeo(new RoundedBoxGeometry(0.04, 0.075, 0.64, 2, 0.01)),
-    obsidianRoofMat
-  );
-  lowerIntake.position.set(0.885, 0.215, 0);
-  suv.add(lowerIntake);
-
-  for (const bz of [-0.26, 0.26]) {
-    const blade = new THREE.Mesh(
-      trackGeo(new THREE.BoxGeometry(0.045, 0.018, 0.14)),
-      copperSvMat
-    );
-    blade.position.set(0.892, 0.215, bz);
-    suv.add(blade);
-  }
-
-  const frontPlate = new THREE.Mesh(trackGeo(new THREE.BoxGeometry(0.02, 0.046, 0.18)), plateMat);
-  frontPlate.position.set(0.905, 0.23, 0);
-  suv.add(frontPlate);
-
-  // Signature Rear Gloss-Black Tailgate Finisher Bar + Slim Twin Horizontal LED Tail Lights + Quad Exhausts
-  const rearFinisher = new THREE.Mesh(
-    trackGeo(new RoundedBoxGeometry(0.035, 0.055, 0.68, 2, 0.01)),
-    obsidianRoofMat
-  );
-  rearFinisher.position.set(-0.862, 0.365, 0);
-  suv.add(rearFinisher);
-
-  const tailLampGeo = trackGeo(new RoundedBoxGeometry(0.042, 0.028, 0.17, 2, 0.006));
-  for (const tz of [-0.255, 0.255]) {
-    const tailLed = new THREE.Mesh(tailLampGeo, tailLedMat);
-    tailLed.position.set(-0.866, 0.365, tz);
-    suv.add(tailLed);
-  }
-
-  const rearDiffuser = new THREE.Mesh(
-    trackGeo(new RoundedBoxGeometry(0.05, 0.07, 0.66, 2, 0.01)),
-    obsidianRoofMat
-  );
-  rearDiffuser.position.set(-0.86, 0.17, 0);
-  suv.add(rearDiffuser);
-
-  const exhaustGeo = trackGeo(new THREE.CylinderGeometry(0.022, 0.022, 0.04, 14));
-  exhaustGeo.rotateZ(Math.PI / 2);
-  for (const ez of [-0.26, -0.20, 0.20, 0.26]) {
-    const tip = new THREE.Mesh(exhaustGeo, alloyMat);
-    tip.position.set(-0.885, 0.155, ez);
-    suv.add(tip);
-  }
-
-  // Gloss Black Aerodynamic Side Mirrors
-  const mirrorArmGeo = trackGeo(new RoundedBoxGeometry(0.06, 0.055, 0.085, 2, 0.015));
-  for (const mz of [-0.425, 0.425]) {
-    const mirror = new THREE.Mesh(mirrorArmGeo, obsidianRoofMat);
-    mirror.position.set(0.27, 0.45, mz);
-    suv.add(mirror);
-  }
-
-  // 23-Inch Forged SV Multi-Spoke Alloy Wheels + Crimson Brembo Brake Calipers
-  const wheelRadius = 0.168;
-  const tireGeo = trackGeo(new THREE.CylinderGeometry(wheelRadius, wheelRadius, 0.125, 28));
-  tireGeo.rotateX(Math.PI / 2);
-  const rimOuterGeo = trackGeo(new THREE.CylinderGeometry(0.118, 0.118, 0.132, 24));
-  rimOuterGeo.rotateX(Math.PI / 2);
-  const spokeBarGeo = trackGeo(new THREE.BoxGeometry(0.215, 0.022, 0.136));
-  const hubCapGeo = trackGeo(new THREE.CylinderGeometry(0.036, 0.036, 0.14, 16));
-  hubCapGeo.rotateX(Math.PI / 2);
-  const caliperGeo = trackGeo(new THREE.BoxGeometry(0.065, 0.075, 0.12));
-
-  for (const [wx, wz] of [
-    [-0.51, 0.375],
-    [-0.51, -0.375],
-    [0.52, 0.375],
-    [0.52, -0.375],
-  ]) {
-    const tire = new THREE.Mesh(tireGeo, wheelMat);
-    tire.position.set(wx, wheelRadius, wz);
-    tire.castShadow = true;
-    suv.add(tire);
-
-    const innerRim = new THREE.Mesh(rimOuterGeo, obsidianRoofMat);
-    innerRim.position.set(wx, wheelRadius, wz);
-    suv.add(innerRim);
-
-    // 5-Spoke Forged SV Diamond-Cut Star Pattern
-    for (let s = 0; s < 5; s += 1) {
-      const spoke = new THREE.Mesh(spokeBarGeo, alloyMat);
-      spoke.position.set(wx, wheelRadius, wz);
-      spoke.rotation.z = (s * Math.PI) / 5;
-      suv.add(spoke);
-    }
-
-    const hub = new THREE.Mesh(hubCapGeo, brassMat);
-    hub.position.set(wx, wheelRadius, wz);
-    suv.add(hub);
-
-    const caliper = new THREE.Mesh(caliperGeo, bremboRedMat);
-    caliper.position.set(wx - 0.045, wheelRadius + 0.03, wz * 0.96);
-    suv.add(caliper);
-  }
-
-  suv.scale.setScalar(1.24);
-  return suv;
 }
 
 export const ThreeMatatuTable: React.FC<ThreeMatatuTableProps> = ({
@@ -1265,8 +817,8 @@ export const ThreeMatatuTable: React.FC<ThreeMatatuTableProps> = ({
     target: THREE.Vector3;
   }>({
     active: false,
-    pos: new THREE.Vector3(0, 6.2, 7.6),
-    target: new THREE.Vector3(0, 0.28, 0.15),
+    pos: new THREE.Vector3(0, 7.9, 1.98),
+    target: new THREE.Vector3(0, 0.02, 0.12),
   });
 
   const latestPropsRef = useRef({
@@ -1291,21 +843,23 @@ export const ThreeMatatuTable: React.FC<ThreeMatatuTableProps> = ({
     let rig: ReturnType<typeof createStudioRig>;
     try {
       rig = createStudioRig(el, {
-        backgroundHex: variant === 'blitz' ? 0x030e08 : 0x04120b,
-        fogHex: variant === 'blitz' ? 0x030e08 : 0x04120b,
-        fogDensity: 0.0038,
-        fov: 38,
+        backgroundHex: 0x9b5f25,
+        fogHex: 0x9b5f25,
+        fogDensity: 0,
+        fov: 45,
         minAspect: 1.42,
         shadowBounds: 9,
-        initialCamera: [0, 6.2, 7.6],
-        initialTarget: [0, 0.28, 0.15],
-        minDistance: 4.0,
-        maxDistance: 21,
+        initialCamera: [0, 7.9, 1.98],
+        initialTarget: [0, 0.02, 0.12],
+        minDistance: 4.5,
+        maxDistance: 18,
         roomTheme: 'matatu',
-        toneMappingExposure: 1.04,
-        hemiIntensity: 0.72,
-        keyIntensity: 1.52,
-        rimIntensity: 0.55,
+        antiGlareBoard: true,
+        toneMappingExposure: 0.78,
+        hemiIntensity: 0.56,
+        keyIntensity: 0.24,
+        rimIntensity: 0,
+        environmentIntensity: 0.08,
       });
     } catch {
       setWebglError(true);
@@ -1321,188 +875,243 @@ export const ThreeMatatuTable: React.FC<ThreeMatatuTableProps> = ({
     };
     renderer.domElement.addEventListener('webglcontextlost', onContextLost);
 
-    const bgRoom = buildLuxuryRoomEnvironment(rig, {
-      theme: 'matatu',
-      tableBottomY: -0.5,
-      floorY: -1.95,
-      pedestalScale: 1.25,
-    });
-
-    // Balanced Casino Studio Lighting (Reduced Board Light + Clean Card Contrast)
-    const tableSpot = new THREE.SpotLight(0xfff7df, 24, 26, Math.PI / 3, 0.78, 1.25);
-    tableSpot.position.set(0, 9.6, 0.5);
-    tableSpot.target.position.set(0, 0, 0);
-    scene.add(tableSpot);
-    scene.add(tableSpot.target);
-
-    const frontCardFill = new THREE.DirectionalLight(0xffffff, 0.72);
-    frontCardFill.position.set(0, 4.8, 8.8);
-    scene.add(frontCardFill);
-
-    const carSpot = new THREE.SpotLight(0xfff8e6, 18, 16, Math.PI / 4.2, 0.65, 1.2);
-    carSpot.position.set(4.8, 4.0, 3.4);
-    carSpot.target.position.set(3.48, 0.4, -0.28);
-    scene.add(carSpot);
-    scene.add(carSpot.target);
-
-    const mahoganyTex = trackTexture(createMahoganyTexture(maxAniso, '#421e0d', '#1b0903'));
-    const feltTex = trackTexture(createFeltTexture(maxAniso));
-    const crestTex = trackTexture(createTableFeltCrestTexture(maxAniso, variant));
-    const cardBackTex = trackTexture(createCardBackTexture(maxAniso, variant));
-    const greenChipTex = trackTexture(createCasinoChipTexture(maxAniso, '#0b6e39', '#ffffff', 'MATATU'));
-    const goldChipTex = trackTexture(createCasinoChipTexture(maxAniso, '#c89b24', '#1f2937', 'MATATU'));
-
-    const mahoganyMat = trackMaterial(
-      new THREE.MeshPhysicalMaterial({
-        map: mahoganyTex,
-        roughness: 0.26,
-        metalness: 0.08,
-        clearcoat: 0.62,
-        clearcoatRoughness: 0.16,
-      })
-    );
-    const leatherRailMat = trackMaterial(
-      new THREE.MeshStandardMaterial({ color: 0x171210, roughness: 0.42, metalness: 0.08 })
-    );
-    const brassMat = trackMaterial(
-      new THREE.MeshPhysicalMaterial({ color: 0xd4af37, roughness: 0.18, metalness: 0.92, clearcoat: 0.55 })
-    );
-    const feltMat = trackMaterial(
-      new THREE.MeshStandardMaterial({ map: crestTex, bumpMap: feltTex, bumpScale: 0.016, roughness: 0.85 })
-    );
-    const cardBackMat = trackMaterial(
-      new THREE.MeshStandardMaterial({ map: cardBackTex, roughness: 0.28 })
-    );
-    const cardEdgeMat = trackMaterial(
-      new THREE.MeshStandardMaterial({ color: variant === 'blitz' ? 0xd4af37 : 0xe7decb, roughness: 0.36 })
-    );
-
-    const glassMat = trackMaterial(
-      new THREE.MeshPhysicalMaterial({ color: 0x0f172a, roughness: 0.08, metalness: 0.35, clearcoat: 0.96 })
-    );
-    const wheelMat = trackMaterial(
-      new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.72 })
-    );
-    const headlightMat = trackMaterial(
+    // 1. Main Honey-Wood Vertical Plank Tabletop Slab (Matte Zero-Glare, Uniform Wood Color)
+    const woodBoardTex = trackTexture(createHoneyWoodBoardTexture(maxAniso));
+    const woodBoardMat = trackMaterial(
       new THREE.MeshStandardMaterial({
-        color: 0xfff8dc,
-        emissive: 0xffe484,
-        emissiveIntensity: 1.65,
+        map: woodBoardTex,
+        roughness: 0.96,
+        metalness: 0.0,
+        envMapIntensity: 0.0,
+      })
+    );
+    const woodEdgeMat = trackMaterial(
+      new THREE.MeshStandardMaterial({
+        color: 0xb8742e,
+        roughness: 0.94,
+        metalness: 0.0,
+        envMapIntensity: 0.0,
       })
     );
 
-    const chipGreenMat = trackMaterial(
-      new THREE.MeshStandardMaterial({ map: greenChipTex, roughness: 0.26 })
+    const outerFloor = new THREE.Mesh(
+      trackGeometry(new THREE.PlaneGeometry(40, 40)),
+      trackMaterial(
+        new THREE.MeshStandardMaterial({
+          color: 0x9b5f25,
+          roughness: 0.96,
+          metalness: 0.0,
+          envMapIntensity: 0.0,
+        })
+      )
     );
-    const chipGoldMat = trackMaterial(
-      new THREE.MeshStandardMaterial({ map: goldChipTex, roughness: 0.22, metalness: 0.42 })
+    outerFloor.rotation.x = -Math.PI / 2;
+    outerFloor.position.y = -0.44;
+    outerFloor.receiveShadow = true;
+    scene.add(outerFloor);
+
+    const boardSlab = new THREE.Mesh(
+      trackGeometry(new RoundedBoxGeometry(15.8, 0.42, 9.8, 4, 0.08)),
+      woodBoardMat
+    );
+    boardSlab.position.set(0, -0.21, 0);
+    boardSlab.receiveShadow = true;
+    boardSlab.castShadow = true;
+    scene.add(boardSlab);
+
+    const isBlitzMode = variant === 'blitz';
+
+    // 2. Raised Center Plaque (Blitz Dark Glossy Crimson-Gold-Black vs Royale Honey-Wood "MATATU")
+    const plaqueW = isBlitzMode ? 7.15 : 4.65;
+    const plaqueD = isBlitzMode ? 2.75 : 2.28;
+    const plaqueTex = trackTexture(
+      isBlitzMode ? createBlitzPlaqueTexture(maxAniso) : createMatatuPlaqueTexture(maxAniso, variant)
+    );
+    const plaqueTopMat = trackMaterial(
+      new THREE.MeshStandardMaterial({
+        map: plaqueTex,
+        roughness: isBlitzMode ? 0.88 : 0.96,
+        metalness: 0.0,
+        envMapIntensity: 0.0,
+      })
+    );
+    const plaqueRimMat = isBlitzMode
+      ? trackMaterial(
+          new THREE.MeshStandardMaterial({
+            color: 0xdbe2ea,
+            roughness: 0.72,
+            metalness: 0.0,
+            envMapIntensity: 0.0,
+          })
+        )
+      : woodEdgeMat;
+
+    const plaqueBase = new THREE.Mesh(
+      trackGeometry(new RoundedBoxGeometry(plaqueW, 0.1, plaqueD, 3, 0.16)),
+      plaqueRimMat
+    );
+    plaqueBase.position.set(isBlitzMode ? -0.35 : 0, 0.042, -0.05);
+    plaqueBase.castShadow = true;
+    plaqueBase.receiveShadow = true;
+    scene.add(plaqueBase);
+
+    const plaqueFace = new THREE.Mesh(
+      trackGeometry(new THREE.PlaneGeometry(plaqueW - 0.12, plaqueD - 0.12)),
+      plaqueTopMat
+    );
+    plaqueFace.rotation.x = -Math.PI / 2;
+    plaqueFace.position.set(isBlitzMode ? -0.35 : 0, 0.095, -0.05);
+    plaqueFace.receiveShadow = true;
+    scene.add(plaqueFace);
+
+    // 3. Left Turn-Direction Triangles on Central Plaque (Top Gold ▲, Bottom Red ▼)
+    const upTriShape = new THREE.Shape();
+    upTriShape.moveTo(0, 0.17);
+    upTriShape.lineTo(-0.22, -0.14);
+    upTriShape.lineTo(0.22, -0.14);
+    upTriShape.closePath();
+
+    const triGeo = trackGeometry(
+      new THREE.ExtrudeGeometry(upTriShape, {
+        depth: 0.03,
+        bevelEnabled: true,
+        bevelThickness: 0.01,
+        bevelSize: 0.01,
+        bevelSegments: 2,
+      })
+    );
+    triGeo.rotateX(-Math.PI / 2);
+
+    const upTriMat = trackMaterial(
+      new THREE.MeshStandardMaterial({
+        color: 0xfacc15,
+        roughness: 0.85,
+        metalness: 0.0,
+        envMapIntensity: 0.0,
+        emissive: 0x000000,
+        emissiveIntensity: 0,
+      })
+    );
+    const downTriMat = trackMaterial(
+      new THREE.MeshStandardMaterial({
+        color: 0xd91c1c,
+        roughness: 0.85,
+        metalness: 0.0,
+        envMapIntensity: 0.0,
+        emissive: 0x000000,
+        emissiveIntensity: 0,
+      })
     );
 
-    // Octagonal Mahogany Casino Table Base + Padded Leather Rail + Emerald Damask Felt Surface
-    const tableBase = new THREE.Mesh(
-      trackGeometry(new THREE.CylinderGeometry(5.9, 6.2, 0.52, 8)),
-      mahoganyMat
-    );
-    tableBase.scale.set(1.18, 1, 0.86);
-    tableBase.position.y = -0.25;
-    tableBase.castShadow = true;
-    tableBase.receiveShadow = true;
-    scene.add(tableBase);
+    const triX = isBlitzMode ? -3.48 : -1.92;
+    const triZTop = isBlitzMode ? -1.04 : -0.74;
+    const triZBot = isBlitzMode ? 0.94 : 0.64;
 
-    const paddedRail = new THREE.Mesh(
-      trackGeometry(new THREE.TorusGeometry(5.55, 0.34, 18, 8)),
-      leatherRailMat
-    );
-    paddedRail.rotation.x = Math.PI / 2;
-    paddedRail.rotation.z = Math.PI / 8;
-    paddedRail.scale.set(1.18, 0.86, 1);
-    paddedRail.position.y = 0.08;
-    paddedRail.castShadow = true;
-    scene.add(paddedRail);
+    const upTriangle = new THREE.Mesh(triGeo, upTriMat);
+    upTriangle.position.set(triX, 0.098, triZTop);
+    upTriangle.castShadow = true;
+    scene.add(upTriangle);
 
-    const goldInlay = new THREE.Mesh(
-      trackGeometry(new THREE.TorusGeometry(5.12, 0.058, 12, 8)),
-      brassMat
-    );
-    goldInlay.rotation.x = Math.PI / 2;
-    goldInlay.rotation.z = Math.PI / 8;
-    goldInlay.scale.set(1.18, 0.86, 1);
-    goldInlay.position.y = 0.05;
-    scene.add(goldInlay);
+    const downTriangle = new THREE.Mesh(triGeo, downTriMat);
+    downTriangle.rotation.y = Math.PI;
+    downTriangle.position.set(triX, 0.098, triZBot);
+    downTriangle.castShadow = true;
+    scene.add(downTriangle);
 
-    const feltSurface = new THREE.Mesh(
-      trackGeometry(new THREE.CylinderGeometry(5.18, 5.18, 0.06, 8)),
-      feltMat
+    // 4. Left Frosted Parchment 4-Suit Card Panel (Royale mode)
+    let currentSuitPadSuit: Suit = latestPropsRef.current.gameState.activeSuit || 'hearts';
+    let suitPadTex = trackTexture(createFourSuitsPadTexture(maxAniso, currentSuitPadSuit));
+    const suitPadMat = trackMaterial(
+      new THREE.MeshStandardMaterial({
+        map: suitPadTex,
+        roughness: 0.94,
+        metalness: 0.0,
+        envMapIntensity: 0.0,
+      })
     );
-    feltSurface.rotation.y = Math.PI / 8;
-    feltSurface.scale.set(1.18, 1, 0.86);
-    feltSurface.position.y = 0.01;
-    feltSurface.receiveShadow = true;
-    scene.add(feltSurface);
+    if (!isBlitzMode) {
+      const suitPadSideMat = trackMaterial(
+        new THREE.MeshStandardMaterial({
+          color: 0xd8c3a5,
+          roughness: 0.94,
+          metalness: 0.0,
+          envMapIntensity: 0.0,
+        })
+      );
+      const suitPadSlab = new THREE.Mesh(
+        trackGeometry(new RoundedBoxGeometry(2.05, 0.04, 2.05, 2, 0.06)),
+        suitPadSideMat
+      );
+      suitPadSlab.position.set(-4.05, 0.018, -0.02);
+      suitPadSlab.castShadow = true;
+      suitPadSlab.receiveShadow = true;
+      scene.add(suitPadSlab);
 
-    // Brushed Brass Turntable Pad + Latest 2025/2026 Range Rover Sport L461
-    const carPad = new THREE.Mesh(
-      trackGeometry(new THREE.CylinderGeometry(1.24, 1.32, 0.04, 36)),
-      brassMat
-    );
-    carPad.position.set(3.48, 0.045, -0.28);
-    carPad.receiveShadow = true;
-    scene.add(carPad);
-
-    const rangeRoverSport = buildLatestRangeRoverSport(
-      brassMat,
-      glassMat,
-      wheelMat,
-      headlightMat,
-      trackGeometry,
-      trackMaterial
-    );
-    rangeRoverSport.position.set(3.48, 0.065, -0.28);
-    scene.add(rangeRoverSport);
-
-    // Brass Dealer Medallion Puck
-    const dealerPuck = new THREE.Mesh(
-      trackGeometry(new THREE.CylinderGeometry(0.32, 0.34, 0.08, 24)),
-      brassMat
-    );
-    dealerPuck.position.set(-2.55, 0.08, 0.65);
-    dealerPuck.castShadow = true;
-    scene.add(dealerPuck);
-
-    // 3D Poker Chip Stacks beside Pot
-    const chipsGroup = new THREE.Group();
-    chipsGroup.position.set(-3.35, 0.04, -0.5);
-    const chipGeo = trackGeometry(new THREE.CylinderGeometry(0.30, 0.30, 0.068, 32));
-    for (let i = 0; i < 6; i += 1) {
-      const c = new THREE.Mesh(chipGeo, i % 2 === 0 ? chipGreenMat : chipGoldMat);
-      c.position.y = 0.034 + i * 0.07;
-      c.castShadow = true;
-      chipsGroup.add(c);
+      const suitPadTop = new THREE.Mesh(
+        trackGeometry(new THREE.PlaneGeometry(1.94, 1.94)),
+        suitPadMat
+      );
+      suitPadTop.rotation.x = -Math.PI / 2;
+      suitPadTop.position.set(-4.05, 0.041, -0.02);
+      suitPadTop.receiveShadow = true;
+      scene.add(suitPadTop);
     }
-    for (let i = 0; i < 4; i += 1) {
-      const c = new THREE.Mesh(chipGeo, i % 2 === 0 ? chipGoldMat : chipGreenMat);
-      c.position.set(0.65, 0.034 + i * 0.07, 0.24);
-      c.castShadow = true;
-      chipsGroup.add(c);
-    }
-    scene.add(chipsGroup);
 
-    // Larger Anti-Glare 3D Card Geometry for Maximum Artwork Clarity
-    const cardGeo = trackGeometry(new THREE.BoxGeometry(1.32, 0.028, 1.85));
+    // 5. Card Stock Materials & Geometry (USA Flag Opponent Cards, Ugandan Flag Blitz Deck / Classic Rider-Back)
+    const cardGeo = trackGeometry(new THREE.BoxGeometry(1.14, 0.022, 1.58));
+    const classicBackTex = trackTexture(createClassicCardBackTexture(maxAniso));
+    const usaFlagBackTex = trackTexture(createUsaFlagCardBackTexture(maxAniso));
+    const ugandaFlagBackTex = trackTexture(createUgandaFlagCardBackTexture(maxAniso));
+
+    const classicBackMat = trackMaterial(
+      new THREE.MeshStandardMaterial({
+        map: classicBackTex,
+        roughness: 0.92,
+        metalness: 0.0,
+        envMapIntensity: 0.0,
+      })
+    );
+    const usaFlagBackMat = trackMaterial(
+      new THREE.MeshStandardMaterial({
+        map: usaFlagBackTex,
+        roughness: 0.92,
+        metalness: 0.0,
+        envMapIntensity: 0.0,
+      })
+    );
+    const ugandaFlagBackMat = trackMaterial(
+      new THREE.MeshStandardMaterial({
+        map: ugandaFlagBackTex,
+        roughness: 0.92,
+        metalness: 0.0,
+        envMapIntensity: 0.0,
+      })
+    );
+    const drawBackMat = isBlitzMode ? ugandaFlagBackMat : classicBackMat;
+
+    const cardEdgeMat = trackMaterial(
+      new THREE.MeshStandardMaterial({
+        color: 0xf4f4f4,
+        roughness: 0.92,
+        metalness: 0.0,
+        envMapIntensity: 0.0,
+      })
+    );
     const cardFaceCache = new Map<string, THREE.MeshStandardMaterial>();
 
     const getCardFaceMaterial = (card: PlayingCardType, highlight: boolean) => {
-      const key = `${variant}_${card.rank}_${card.suit}_${highlight ? 'hi' : 'std'}`;
+      const key = `classic_${card.rank}_${card.suit}_${highlight ? 'hi' : 'std'}`;
       let mat = cardFaceCache.get(key);
       if (!mat) {
-        const tex = trackTexture(createCardFaceTexture(card, maxAniso, highlight, variant));
+        const tex = trackTexture(createClassicCardFaceTexture(card, maxAniso, highlight));
         mat = trackMaterial(
           new THREE.MeshStandardMaterial({
             map: tex,
-            roughness: 0.54,
+            roughness: 0.94,
             metalness: 0.0,
-            emissive: highlight ? new THREE.Color(0x283a04) : new THREE.Color(0x000000),
-            emissiveIntensity: highlight ? 0.24 : 0,
+            envMapIntensity: 0.0,
+            emissive: highlight ? new THREE.Color(0x0b3b18) : new THREE.Color(0x000000),
+            emissiveIntensity: highlight ? 0.09 : 0,
           })
         );
         cardFaceCache.set(key, mat);
@@ -1521,130 +1130,199 @@ export const ThreeMatatuTable: React.FC<ThreeMatatuTableProps> = ({
       dynamicCardsGroup.clear();
       clickableObjects.length = 0;
 
-      // Orient Latest Range Rover Sport cleanly at 3/4 hero angle showing headlights, clamshell hood & floating black roof
-      rangeRoverSport.rotation.y = gs.direction === -1 ? Math.PI - 0.58 : -0.58;
+      // Update left 4-suit highlight pad when activeSuit changes (Royale)
+      const targetSuit: Suit = gs.activeSuit || 'hearts';
+      if (!isBlitzMode && targetSuit !== currentSuitPadSuit) {
+        currentSuitPadSuit = targetSuit;
+        const nextTex = trackTexture(createFourSuitsPadTexture(maxAniso, targetSuit));
+        suitPadMat.map = nextTex;
+        suitPadMat.needsUpdate = true;
+        suitPadTex = nextTex;
+      }
 
-      // 1. 3D Draw Deck Stack (Left Center)
-      const deckCards = Math.max(1, Math.min(10, Math.ceil((gs.deckCount || 52) / 4)));
+      // Highlight active turn triangle on central plaque
+      const activePlay = gs.status === 'in_progress';
+      if (activePlay && yourTurn) {
+        downTriMat.emissive.setHex(0xff2222);
+        downTriMat.emissiveIntensity = 0.24;
+        upTriMat.emissive.setHex(0x000000);
+        upTriMat.emissiveIntensity = 0;
+      } else if (activePlay && !yourTurn) {
+        upTriMat.emissive.setHex(0xffd76a);
+        upTriMat.emissiveIntensity = 0.22;
+        downTriMat.emissive.setHex(0x000000);
+        downTriMat.emissiveIntensity = 0;
+      } else {
+        upTriMat.emissive.setHex(0x000000);
+        upTriMat.emissiveIntensity = 0;
+        downTriMat.emissive.setHex(0x000000);
+        downTriMat.emissiveIntensity = 0;
+      }
+
+      // 1. Top Opponent Cards Row with USA Flag Card Back
+      const opponent = gs.seats.find((s) => s.uid !== uid);
+      const oppCount =
+        gs.status === 'waiting'
+          ? 5
+          : Math.min(8, Math.max(0, opponent?.cardCount || 0));
+      const oppStep = oppCount > 6 ? 0.94 : 1.24;
+      for (let i = 0; i < oppCount; i += 1) {
+        const x = (i - (oppCount - 1) / 2) * oppStep - 0.55;
+        const c = new THREE.Mesh(cardGeo, [
+          cardEdgeMat,
+          cardEdgeMat,
+          usaFlagBackMat,
+          usaFlagBackMat,
+          cardEdgeMat,
+          cardEdgeMat,
+        ]);
+        c.position.set(x, 0.015, -2.35);
+        c.castShadow = true;
+        c.receiveShadow = true;
+        dynamicCardsGroup.add(c);
+      }
+
+      // 2. Draw Pile + Sideways Peeking Cut Card
+      const cutCard: PlayingCardType =
+        gs.pendingCutCard ??
+        (isBlitzMode
+          ? { id: 'cut_9_diamonds', rank: '9', suit: 'diamonds' }
+          : { id: 'cut_4_diamonds', rank: '4', suit: 'diamonds' });
+      const cutFaceMat = getCardFaceMaterial(cutCard, false);
+      const cutBaseY = isBlitzMode ? 0.108 : 0.015;
+      const cutX = isBlitzMode ? 1.56 : 3.48;
+      const deckX = isBlitzMode ? 2.15 : 4.15;
+
+      const cutMesh = new THREE.Mesh(cardGeo, [
+        cardEdgeMat,
+        cardEdgeMat,
+        cutFaceMat,
+        drawBackMat,
+        cardEdgeMat,
+        cardEdgeMat,
+      ]);
+      cutMesh.position.set(cutX, cutBaseY, -0.05);
+      cutMesh.rotation.y = Math.PI / 2;
+      cutMesh.castShadow = true;
+      cutMesh.receiveShadow = true;
+      dynamicCardsGroup.add(cutMesh);
+
+      const deckCards = Math.max(1, Math.min(9, Math.ceil((gs.deckCount || 40) / 5)));
       for (let i = 0; i < deckCards; i += 1) {
         const m = new THREE.Mesh(cardGeo, [
           cardEdgeMat,
           cardEdgeMat,
-          cardBackMat,
+          drawBackMat,
           cardEdgeMat,
           cardEdgeMat,
           cardEdgeMat,
         ]);
-        m.position.set(-1.18, 0.055 + i * 0.028, -0.15);
-        m.rotation.y = 0.06;
+        m.position.set(deckX, cutBaseY + 0.025 + i * 0.02, -0.05);
         m.castShadow = true;
+        m.receiveShadow = true;
         m.userData = { action: gs.status === 'waiting' ? 'noop' : 'draw' };
         dynamicCardsGroup.add(m);
-        if (i === deckCards - 1 && gs.status !== 'waiting') clickableObjects.push(m);
+        if (i === deckCards - 1 && gs.status !== 'waiting') {
+          clickableObjects.push(m);
+        }
       }
 
-      if (gs.status === 'waiting') {
-        const showcaseCards: PlayingCardType[] =
-          variant === 'blitz'
+      // 3. Organic Messy Tilted Discard Pile
+      const discardCenterX = isBlitzMode ? -1.45 : 0.04;
+      const underCards: Array<{ card: PlayingCardType; dx: number; dz: number; rot: number }> = [
+        { card: { id: 'under_kh', rank: 'K', suit: 'spades' }, dx: 0.08, dz: 0.14, rot: 0.42 },
+        { card: { id: 'under_2c', rank: '2', suit: 'clubs' }, dx: -0.18, dz: -0.06, rot: -0.25 },
+        { card: { id: 'under_2h', rank: '2', suit: 'hearts' }, dx: -0.12, dz: -0.22, rot: 0.65 },
+        { card: { id: 'under_7s', rank: '7', suit: 'spades' }, dx: 0.14, dz: -0.12, rot: -0.95 },
+      ];
+
+      const showUnderCount =
+        gs.status === 'waiting' ? (isBlitzMode ? 2 : 4) : Math.min(4, Math.max(0, (gs.discardCount || 1) - 1));
+
+      for (let i = 0; i < showUnderCount; i += 1) {
+        const u = underCards[i];
+        const underMat = getCardFaceMaterial(u.card, false);
+        const underMesh = new THREE.Mesh(cardGeo, [
+          cardEdgeMat,
+          cardEdgeMat,
+          underMat,
+          drawBackMat,
+          cardEdgeMat,
+          cardEdgeMat,
+        ]);
+        underMesh.position.set(discardCenterX + u.dx, 0.114 + i * 0.023, -0.04 + u.dz);
+        underMesh.rotation.y = u.rot;
+        underMesh.castShadow = true;
+        underMesh.receiveShadow = true;
+        dynamicCardsGroup.add(underMesh);
+      }
+
+      const topDiscardCard: PlayingCardType =
+        gs.status === 'waiting'
+          ? isBlitzMode
+            ? { id: 'preview_3h', rank: '3', suit: 'hearts' }
+            : { id: 'preview_ah', rank: 'A', suit: 'hearts' }
+          : gs.topDiscard ?? { id: 'fallback_ah', rank: 'A', suit: 'hearts' };
+
+      const topMat = getCardFaceMaterial(topDiscardCard, false);
+      const topMesh = new THREE.Mesh(cardGeo, [
+        cardEdgeMat,
+        cardEdgeMat,
+        topMat,
+        drawBackMat,
+        cardEdgeMat,
+        cardEdgeMat,
+      ]);
+      topMesh.position.set(discardCenterX, 0.114 + showUnderCount * 0.023 + 0.012, -0.02);
+      topMesh.rotation.y = isBlitzMode ? -0.22 : 0.68;
+      topMesh.castShadow = true;
+      topMesh.receiveShadow = true;
+      dynamicCardsGroup.add(topMesh);
+
+      // 4. Bottom Player Hand Cards (Classic Pure-White Large-Suit Cards)
+      const bottomCards: PlayingCardType[] =
+        gs.status === 'waiting' && (!gs.yourHand || gs.yourHand.length === 0)
+          ? isBlitzMode
             ? [
-                { id: 'blitz_2s', rank: '2', suit: 'spades' },
-                { id: 'blitz_7d', rank: '7', suit: 'diamonds' },
-                { id: 'blitz_ks', rank: 'K', suit: 'spades' },
-                { id: 'blitz_qh', rank: 'Q', suit: 'hearts' },
+                { id: 'preview_8s', rank: '8', suit: 'spades' },
+                { id: 'preview_2s', rank: '2', suit: 'spades' },
+                { id: 'preview_10d', rank: '10', suit: 'diamonds' },
+                { id: 'preview_qc', rank: 'Q', suit: 'clubs' },
+                { id: 'preview_4h', rank: '4', suit: 'hearts' },
+                { id: 'preview_kc', rank: 'K', suit: 'clubs' },
+                { id: 'preview_kh', rank: 'K', suit: 'hearts' },
               ]
             : [
-                { id: 'royale_as', rank: 'A', suit: 'spades' },
-                { id: 'royale_kh', rank: 'K', suit: 'hearts' },
-                { id: 'royale_qc', rank: 'Q', suit: 'clubs' },
-                { id: 'royale_jd', rank: 'J', suit: 'diamonds' },
-              ];
-        showcaseCards.forEach((card, idx) => {
-          const offsetX = (idx - 1.5) * 0.96 + 0.42;
-          const faceMat = getCardFaceMaterial(card, false);
-          const mesh = new THREE.Mesh(cardGeo, [
-            cardEdgeMat,
-            cardEdgeMat,
-            faceMat,
-            cardBackMat,
-            cardEdgeMat,
-            cardEdgeMat,
-          ]);
-          mesh.position.set(offsetX, 0.86, 1.38 + idx * 0.012);
-          mesh.rotation.x = 0.88;
-          mesh.rotation.z = -(idx - 1.5) * 0.11;
-          mesh.castShadow = true;
-          dynamicCardsGroup.add(mesh);
-        });
-      } else {
-        // 2. 3D Discard Pile (Center)
-        if (gs.discardCount > 1) {
-          const under = new THREE.Mesh(cardGeo, cardEdgeMat);
-          under.position.set(0.85, 0.055, -0.15);
-          under.rotation.y = -0.18;
-          under.castShadow = true;
-          dynamicCardsGroup.add(under);
-        }
-        if (gs.topDiscard) {
-          const topMat = getCardFaceMaterial(gs.topDiscard, false);
-          const topCard = new THREE.Mesh(cardGeo, [
-            cardEdgeMat,
-            cardEdgeMat,
-            topMat,
-            cardBackMat,
-            cardEdgeMat,
-            cardEdgeMat,
-          ]);
-          topCard.position.set(0.9, 0.09, -0.15);
-          topCard.rotation.y = 0.04;
-          topCard.castShadow = true;
-          dynamicCardsGroup.add(topCard);
-        }
+                { id: 'preview_qd', rank: 'Q', suit: 'diamonds' },
+                { id: 'preview_4h', rank: '4', suit: 'hearts' },
+              ]
+          : gs.yourHand || [];
 
-        // 3. 3D Opponent Fanned Hand across top edge
-        const opponent = gs.seats.find((s) => s.uid !== uid);
-        const oppCount = Math.min(10, Math.max(0, opponent?.cardCount || 0));
-        for (let i = 0; i < oppCount; i += 1) {
-          const spread = (i - (oppCount - 1) / 2) * 0.44;
-          const c = new THREE.Mesh(cardGeo, [
-            cardEdgeMat,
-            cardEdgeMat,
-            cardBackMat,
-            cardBackMat,
-            cardEdgeMat,
-            cardEdgeMat,
-          ]);
-          c.position.set(spread, 0.56, -2.85 - Math.abs(spread) * 0.05);
-          c.rotation.x = Math.PI / 2 - 0.35;
-          c.rotation.z = -spread * 0.08;
-          c.castShadow = true;
-          dynamicCardsGroup.add(c);
-        }
-
-        // 4. 3D Player Hand along front edge facing viewer upright for crisp reading
-        const hand = gs.yourHand || [];
-        const n = hand.length;
-        const step = n > 7 ? 0.68 : 0.94;
-        hand.forEach((card, idx) => {
-          const playable = yourTurn && playableIds.has(card.id);
-          const offsetX = (idx - (n - 1) / 2) * step;
-          const faceMat = getCardFaceMaterial(card, playable);
-          const mesh = new THREE.Mesh(cardGeo, [
-            cardEdgeMat,
-            cardEdgeMat,
-            faceMat,
-            cardBackMat,
-            cardEdgeMat,
-            cardEdgeMat,
-          ]);
-          mesh.position.set(offsetX, playable ? 1.02 : 0.84, 2.45 + idx * 0.01);
-          mesh.rotation.x = 0.98;
-          mesh.rotation.z = -offsetX * 0.035;
-          mesh.castShadow = true;
-          mesh.userData = { action: 'play', card, playable };
-          dynamicCardsGroup.add(mesh);
+      const n = bottomCards.length;
+      const handStep = isBlitzMode ? (n > 7 ? 0.96 : 1.18) : n > 7 ? 0.92 : 1.24;
+      bottomCards.forEach((card, idx) => {
+        const playable = gs.status !== 'waiting' && yourTurn && playableIds.has(card.id);
+        const offsetX =
+          (idx - (n - 1) / 2) * handStep - (!isBlitzMode && n <= 2 ? 0.6 : isBlitzMode ? 0.55 : 0);
+        const faceMat = getCardFaceMaterial(card, playable);
+        const mesh = new THREE.Mesh(cardGeo, [
+          cardEdgeMat,
+          cardEdgeMat,
+          faceMat,
+          drawBackMat,
+          cardEdgeMat,
+          cardEdgeMat,
+        ]);
+        mesh.position.set(offsetX, playable ? 0.12 : 0.03, 2.38 + idx * 0.008);
+        mesh.rotation.x = 0.16;
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.userData = { action: gs.status === 'waiting' ? 'noop' : 'play', card, playable };
+        dynamicCardsGroup.add(mesh);
+        if (gs.status !== 'waiting') {
           clickableObjects.push(mesh);
-        });
-      }
+        }
+      });
 
       requestRender();
     };
@@ -1671,10 +1349,7 @@ export const ThreeMatatuTable: React.FC<ThreeMatatuTableProps> = ({
       frameId = requestAnimationFrame(() => {
         renderDirty = false;
         const dt = Math.min(0.05, clock.getDelta() || 0.016);
-        const elapsed = clock.elapsedTime;
         let needsAnother = false;
-
-        bgRoom.updateBackgroundGameplay(elapsed, dt);
 
         if (camTransitionRef.current.active) {
           _vCamPos.copy(camTransitionRef.current.pos);
@@ -1753,7 +1428,7 @@ export const ThreeMatatuTable: React.FC<ThreeMatatuTableProps> = ({
     const ro = new ResizeObserver(() => {
       const w = Math.max(320, el.clientWidth);
       const h = Math.max(260, el.clientHeight);
-      fitCameraFovForAspect(camera, 38, w, h, 1.42);
+      fitCameraFovForAspect(camera, 45, w, h, 1.42);
       renderer.setSize(w, h, false);
       requestRender();
     });
@@ -1784,14 +1459,14 @@ export const ThreeMatatuTable: React.FC<ThreeMatatuTableProps> = ({
 
   useEffect(() => {
     if (cameraPreset === 'overhead') {
-      camTransitionRef.current.pos.set(0, 10.6, 2.0);
-      camTransitionRef.current.target.set(0, 0.2, 0.15);
+      camTransitionRef.current.pos.set(0, 9.2, 0.22);
+      camTransitionRef.current.target.set(0, 0, 0);
     } else if (cameraPreset === 'dramatic') {
-      camTransitionRef.current.pos.set(4.1, 4.3, 7.6);
-      camTransitionRef.current.target.set(0, 0.32, 0.15);
+      camTransitionRef.current.pos.set(0, 5.2, 6.8);
+      camTransitionRef.current.target.set(0, 0.06, 0.1);
     } else {
-      camTransitionRef.current.pos.set(0, 6.2, 7.6);
-      camTransitionRef.current.target.set(0, 0.28, 0.15);
+      camTransitionRef.current.pos.set(0, 7.9, 1.98);
+      camTransitionRef.current.target.set(0, 0.02, 0.12);
     }
     camTransitionRef.current.active = true;
     sceneSyncRef.current?.();
@@ -1803,7 +1478,7 @@ export const ThreeMatatuTable: React.FC<ThreeMatatuTableProps> = ({
 
   if (webglError) {
     return (
-      <div className="w-full h-[360px] rounded-xl border border-[#D4AF37]/40 bg-[#052315] flex items-center justify-center p-6 text-center text-xs text-neutral-300">
+      <div className="w-full h-[360px] rounded-xl border border-[#8A521E]/60 bg-[#C2803A] flex items-center justify-center p-6 text-center text-xs text-amber-50">
         3D WebGL context unavailable on this device. Use the card hand bar below to play.
       </div>
     );
@@ -1812,19 +1487,19 @@ export const ThreeMatatuTable: React.FC<ThreeMatatuTableProps> = ({
   return (
     <div className="w-full space-y-2.5">
       <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-        <div className="flex items-center gap-2 text-[11px] font-medium text-neutral-200">
+        <div className="flex items-center gap-2 text-[11px] font-medium text-amber-100/90">
           <span>
             Active Suit:{' '}
-            <strong className={isRedSuit ? 'text-red-400' : 'text-[#FFD76A]'}>
+            <strong className={isRedSuit ? 'text-red-300' : 'text-[#FFD76A]'}>
               {activeSuitSymbol} {activeSuitLabel}
             </strong>
           </span>
-          <span className="text-neutral-500">·</span>
-          <span>Click 3D Deck to draw or click highlighted 3D Cards to play · Drag to orbit</span>
+          <span className="text-amber-300/50">·</span>
+          <span>Click 3D Deck to draw or click green-ringed 3D Cards to play · Drag to orbit</span>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1 bg-[#0C120E] border border-white/10 rounded-lg p-0.5">
+          <div className="flex items-center gap-1 bg-[#3D220A] border border-[#8D5824]/55 rounded-lg p-0.5">
             {(
               [
                 ['default', 'HD View'],
@@ -1838,8 +1513,8 @@ export const ThreeMatatuTable: React.FC<ThreeMatatuTableProps> = ({
                 onClick={() => setCameraPreset(key)}
                 className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors cursor-pointer whitespace-nowrap ${
                   cameraPreset === key
-                    ? 'bg-[#0D4A2E] text-[#FFD76A]'
-                    : 'text-neutral-400 hover:text-white'
+                    ? 'bg-[#B97732] text-white'
+                    : 'text-amber-200/75 hover:text-white'
                 }`}
               >
                 {label}
@@ -1856,23 +1531,43 @@ export const ThreeMatatuTable: React.FC<ThreeMatatuTableProps> = ({
       </div>
 
       <div
-        className={`relative w-full overflow-hidden rounded-[20px] border-2 ${
-          variant === 'blitz' ? 'border-[#FFD76A]/85' : 'border-[#C99B27]/80'
-        } bg-[#04120B] shadow-[0_28px_60px_rgba(0,0,0,0.9)] ${
-          isFullscreen ? 'h-[calc(100dvh-225px)] min-h-[500px]' : 'h-[480px] sm:h-[580px] lg:h-[620px]'
+        className={`relative w-full overflow-hidden rounded-[20px] border-2 border-[#754316] bg-[#9B5F25] shadow-[0_24px_50px_rgba(0,0,0,0.62)] ${
+          isFullscreen
+            ? 'h-[calc(100dvh-132px)] min-h-[560px]'
+            : 'h-[560px] sm:h-[680px] lg:h-[760px] xl:h-[810px]'
         }`}
       >
-        <img
-          src={proBgMatatu}
-          alt=""
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center"
-        />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_38%,rgba(3,10,6,0.56)_100%)]"
-        />
         <div ref={mountRef} className="relative z-10 h-full w-full" />
+
+        {/* Bottom-Right Pause / View Button (||) matching Reference Image */}
+        <button
+          type="button"
+          onClick={() => {
+            if (onToggleFullscreen) {
+              onToggleFullscreen();
+            } else {
+              setCameraPreset((prev) => (prev === 'default' ? 'overhead' : 'default'));
+            }
+          }}
+          title={onToggleFullscreen ? (isFullscreen ? 'Exit Fullscreen' : 'Expand Board') : 'Switch Camera Angle'}
+          aria-label="Board Pause or View Control"
+          className={`absolute bottom-3.5 right-4 z-20 flex h-10 w-16 items-center justify-center gap-1.5 rounded-xl border-2 transition-transform hover:scale-105 active:scale-95 cursor-pointer ${
+            variant === 'blitz'
+              ? 'border-[#E2E8F0]/80 bg-gradient-to-r from-[#111111] via-[#FACC15] to-[#DC2626] shadow-[0_6px_14px_rgba(0,0,0,0.55)] -skew-x-12'
+              : 'border-[#4A290D] bg-[#784A1E] shadow-[0_6px_14px_rgba(0,0,0,0.48),inset_0_1px_0_rgba(255,215,155,0.28)]'
+          }`}
+        >
+          <span
+            className={`h-4.5 w-1.5 rounded-sm ${
+              variant === 'blitz' ? 'bg-[#F1F5F9] shadow-[0_1px_3px_rgba(0,0,0,0.85)]' : 'bg-[#FBBF24]'
+            }`}
+          />
+          <span
+            className={`h-4.5 w-1.5 rounded-sm ${
+              variant === 'blitz' ? 'bg-[#F1F5F9] shadow-[0_1px_3px_rgba(0,0,0,0.85)]' : 'bg-[#FBBF24]'
+            }`}
+          />
+        </button>
       </div>
     </div>
   );
