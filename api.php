@@ -705,7 +705,7 @@ try {
                 $phone,
                 $customRef,
                 'CASINO ROYALE Deposit (' . (string) $auth['player_id'] . ')',
-                [['uid' => (string) $auth['uid'], 'playerId' => (string) $auth['player_id']]]
+                [['uid' => (string) $auth['uid']], ['playerId' => (string) $auth['player_id']]]
             );
             if ($mp['status'] === 'failed') {
                 cr_json(400, ['ok' => false, 'error' => (string) ($mp['message'] ?? 'MarzPay collection declined.')]);
@@ -988,7 +988,7 @@ try {
                 $payoutPhone,
                 (string) $txRow['reference'],
                 'CASINO ROYALE Payout ' . (string) $txRow['reference'],
-                [['txId' => $txId, 'uid' => (string) $txRow['uid']]]
+                [['txId' => $txId], ['uid' => (string) $txRow['uid']]]
             );
             if ($mpRes['status'] === 'failed') {
                 cr_json(400, ['ok' => false, 'error' => (string) ($mpRes['message'] ?? 'MarzPay disbursement declined.')]);

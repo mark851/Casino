@@ -205,6 +205,50 @@ function cr_marzpay_request(string $method, string $endpointPath, ?array $payloa
 }
 
 /**
+ * MarzPay requires each metadata entry to contain exactly one custom field name (plus optional isPII).
+ *
+ * @param array<int, array<string, mixed>> $extraMetadata
+ * @return array<int, array<string, mixed>>
+ */
+function cr_marzpay_format_metadata(string $reference, array $extraMetadata = []): array
+{
+    $normalized = [['casinoReference' => $reference]];
+    foreach ($extraMetadata as $entry) {
+        if (!is_array($entry)) {
+            continue;
+        }
+        $hasIsPii = array_key_exists('isPII', $entry);
+        $isPii = $hasIsPii ? (bool) $entry['isPII'] : null;
+        $fields = [];
+        foreach ($entry as $k => $v) {
+            if (!is_string($k) || $k === '' || $k === 'isPII' || $v === null || $v === '') {
+                continue;
+            }
+            if (is_scalar($v)) {
+                $fields[$k] = $v;
+            }
+        }
+        if (count($fields) === 1) {
+            foreach ($fields as $fk => $fv) {
+                $item = [$fk => $fv];
+                if ($hasIsPii) {
+                    $item['isPII'] = $isPii;
+                }
+                $normalized[] = $item;
+            }
+        } else {
+            foreach ($fields as $fk => $fv) {
+                $normalized[] = [$fk => $fv];
+            }
+        }
+        if (count($normalized) >= 9) {
+            break;
+        }
+    }
+    return array_slice($normalized, 0, 9);
+}
+
+/**
  * @param array<int, array<string, mixed>> $metadata
  * @return array<string, mixed>
  */
@@ -221,7 +265,7 @@ function cr_marzpay_collect_money(int $amountUgx, string $phoneNumber, string $r
         'country' => $country ?: 'UG',
         'reference' => $uuidRef,
         'description' => substr($description, 0, 160),
-        'metadata' => array_merge([['casinoReference' => $reference]], array_slice($metadata, 0, 8)),
+        'metadata' => cr_marzpay_format_metadata($reference, $metadata),
     ];
     $callback = cr_marzpay_safe_callback_url();
     if ($callback !== null) {
@@ -259,7 +303,7 @@ function cr_marzpay_send_money(int $amountUgx, string $phoneNumber, string $refe
         'country' => $country ?: 'UG',
         'reference' => $uuidRef,
         'description' => substr($description, 0, 160),
-        'metadata' => array_merge([['casinoReference' => $reference]], array_slice($metadata, 0, 8)),
+        'metadata' => cr_marzpay_format_metadata($reference, $metadata),
     ];
     $callback = cr_marzpay_safe_callback_url();
     if ($callback !== null) {

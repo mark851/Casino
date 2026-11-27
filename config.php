@@ -13,20 +13,42 @@ if (PHP_SAPI !== 'cli' && basename((string) ($_SERVER['SCRIPT_FILENAME'] ?? ''))
     exit;
 }
 
+if (!function_exists('cr_env_is_empty')) {
+    function cr_env_is_empty(string $key): bool
+    {
+        $envVal = $_ENV[$key] ?? null;
+        if (is_string($envVal) && trim($envVal) !== '') {
+            return false;
+        }
+        $srvVal = $_SERVER[$key] ?? ($_SERVER['REDIRECT_' . $key] ?? null);
+        if (is_string($srvVal) && trim($srvVal) !== '') {
+            return false;
+        }
+        $getVal = getenv($key);
+        if ($getVal !== false && trim((string) $getVal) !== '') {
+            return false;
+        }
+        return true;
+    }
+}
+
 if (!function_exists('cr_load_env_file')) {
     function cr_load_env_file(string $envPath): void
     {
-        if (!is_file($envPath) || !is_readable($envPath)) {
+        if (!@is_file($envPath) || !@is_readable($envPath)) {
             return;
         }
-        $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        $lines = @file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
         if (!is_array($lines)) {
             return;
         }
         foreach ($lines as $line) {
-            $trimmed = trim($line);
+            $trimmed = trim(ltrim($line, "\xEF\xBB\xBF"));
             if ($trimmed === '' || str_starts_with($trimmed, '#')) {
                 continue;
+            }
+            if (str_starts_with($trimmed, 'export ')) {
+                $trimmed = trim(substr($trimmed, 7));
             }
             $eqPos = strpos($trimmed, '=');
             if ($eqPos === false) {
@@ -43,7 +65,7 @@ if (!function_exists('cr_load_env_file')) {
             ) {
                 $val = substr($val, 1, -1);
             }
-            if (getenv($key) === false && !array_key_exists($key, $_ENV)) {
+            if ($val !== '' && cr_env_is_empty($key)) {
                 $_ENV[$key] = $val;
                 @putenv($key . '=' . $val);
             }
@@ -54,50 +76,98 @@ if (!function_exists('cr_load_env_file')) {
 if (!function_exists('cr_env')) {
     function cr_env(string $key, string $default = ''): string
     {
-        $val = $_ENV[$key]
-            ?? $_SERVER[$key]
-            ?? $_SERVER['REDIRECT_' . $key]
-            ?? getenv($key);
-        if ($val === false || $val === null) {
-            return $default;
+        $candidates = [
+            $_ENV[$key] ?? null,
+            $_SERVER[$key] ?? null,
+            $_SERVER['REDIRECT_' . $key] ?? null,
+            getenv($key),
+            defined($key) ? constant($key) : null,
+        ];
+        foreach ($candidates as $val) {
+            if ($val === false || $val === null || !is_scalar($val)) {
+                continue;
+            }
+            $trimmed = trim((string) $val);
+            if ($trimmed !== '') {
+                return $trimmed;
+            }
         }
-        return trim((string) $val);
+        return $default;
     }
 }
 
 if (!function_exists('cr_load_php_secrets_file')) {
     function cr_load_php_secrets_file(string $secretsPath): void
     {
-        if (!is_file($secretsPath) || !is_readable($secretsPath)) {
+        if (!@is_file($secretsPath) || !@is_readable($secretsPath)) {
             return;
         }
         $data = require $secretsPath;
-        if (!is_array($data)) {
+        if (is_array($data)) {
+            foreach ($data as $key => $value) {
+                if (!is_string($key) || $key === '' || !is_scalar($value)) {
+                    continue;
+                }
+                $upperKey = strtoupper($key);
+                $strVal = trim((string) $value);
+                if ($strVal !== '' && cr_env_is_empty($upperKey)) {
+                    $_ENV[$upperKey] = $strVal;
+                    @putenv($upperKey . '=' . $strVal);
+                }
+            }
             return;
         }
-        foreach ($data as $key => $value) {
-            if (!is_string($key) || $key === '' || !is_scalar($value)) {
+
+        // Also support variable-assignment style inside casinoug-secrets.php (e.g. $DB_NAME = '...')
+        $defined = get_defined_vars();
+        foreach ($defined as $varName => $value) {
+            if ($varName === 'secretsPath' || $varName === 'data' || !is_string($varName) || !is_scalar($value)) {
                 continue;
             }
-            $strVal = (string) $value;
-            if (getenv($key) === false && !array_key_exists($key, $_ENV)) {
-                $_ENV[$key] = $strVal;
-                @putenv($key . '=' . $strVal);
+            $upperKey = strtoupper($varName);
+            $strVal = trim((string) $value);
+            if ($strVal !== '' && cr_env_is_empty($upperKey)) {
+                $_ENV[$upperKey] = $strVal;
+                @putenv($upperKey . '=' . $strVal);
             }
         }
     }
 }
 
-// 1. Optional secrets file placed one directory above public_html in cPanel (non-web-accessible)
-cr_load_php_secrets_file(dirname(__DIR__) . '/casinoug-secrets.php');
-cr_load_php_secrets_file(dirname(__DIR__) . '/casinoroyale-secrets.php');
-cr_load_php_secrets_file(dirname(__DIR__) . '/secrets.php');
-cr_load_env_file(dirname(__DIR__) . '/.env');
-// 2. Fallback to secrets files or .env inside the app directory (blocked from HTTP via .htaccess)
-cr_load_php_secrets_file(__DIR__ . '/casinoug-secrets.php');
-cr_load_php_secrets_file(__DIR__ . '/casinoroyale-secrets.php');
-cr_load_php_secrets_file(__DIR__ . '/secrets.php');
-cr_load_env_file(__DIR__ . '/.env');
+// Discover casinoug-secrets.php / casinoroyale-secrets.php / secrets.php / .env
+// across current folder, up to 4 parent cPanel directories, document root, and sibling site roots.
+$crSearchDirs = [];
+$crAddDir = static function (string $dir) use (&$crSearchDirs): void {
+    $clean = rtrim($dir, "/\\");
+    if ($clean !== '' && !in_array($clean, $crSearchDirs, true) && @is_dir($clean)) {
+        $crSearchDirs[] = $clean;
+    }
+};
+
+$crCursor = __DIR__;
+for ($i = 0; $i < 5; $i++) {
+    $crAddDir($crCursor);
+    $crAddDir($crCursor . '/uganda.casnioug.site');
+    $crAddDir($crCursor . '/public_html');
+    $parent = dirname($crCursor);
+    if ($parent === $crCursor || $parent === '/' || $parent === '\\') {
+        break;
+    }
+    $crCursor = $parent;
+}
+if (!empty($_SERVER['DOCUMENT_ROOT']) && is_string($_SERVER['DOCUMENT_ROOT'])) {
+    $docRoot = $_SERVER['DOCUMENT_ROOT'];
+    $crAddDir($docRoot);
+    $crAddDir(dirname($docRoot));
+}
+
+// Prefer files outside web root first (indices >= 1), then fallback inside the current directory
+foreach ($crSearchDirs as $dir) {
+    cr_load_php_secrets_file($dir . '/casinoug-secrets.php');
+    cr_load_php_secrets_file($dir . '/casinoroyale-secrets.php');
+    cr_load_php_secrets_file($dir . '/secrets.php');
+    cr_load_env_file($dir . '/.env');
+}
 
 if (!function_exists('cr_get_config')) {
     /**

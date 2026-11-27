@@ -228,12 +228,39 @@ function extractTxObject(payload: Record<string, unknown>): Record<string, unkno
   return data;
 }
 
+function formatMarzPayMetadata(
+  reference: string,
+  extraMetadata?: Array<Record<string, string | number | boolean>>
+): Array<Record<string, string | number | boolean>> {
+  const normalized: Array<Record<string, string | number | boolean>> = [
+    { casinoReference: reference },
+  ];
+  for (const entry of extraMetadata || []) {
+    if (!entry || typeof entry !== 'object') continue;
+    const hasIsPii = Object.prototype.hasOwnProperty.call(entry, 'isPII');
+    const isPii = Boolean(entry.isPII);
+    const fields = Object.entries(entry).filter(
+      ([k, v]) => k && k !== 'isPII' && v !== undefined && v !== null && v !== ''
+    );
+    if (fields.length === 1) {
+      const [fk, fv] = fields[0];
+      normalized.push(hasIsPii ? { [fk]: fv, isPII: isPii } : { [fk]: fv });
+    } else {
+      for (const [fk, fv] of fields) {
+        normalized.push({ [fk]: fv });
+      }
+    }
+    if (normalized.length >= 9) break;
+  }
+  return normalized.slice(0, 9);
+}
+
 export async function marzpayCollectMoney(params: {
   amountUgx: number;
   phoneNumber: string;
   reference: string;
   description: string;
-  metadata?: Array<Record<string, string | number>>;
+  metadata?: Array<Record<string, string | number | boolean>>;
 }): Promise<MarzPayTransferResult> {
   const normalizedPhone = normalizeUgPhoneNumber(params.phoneNumber);
   const country = (process.env.MARZPAY_COUNTRY || 'UG').trim().toUpperCase() || 'UG';
@@ -246,10 +273,7 @@ export async function marzpayCollectMoney(params: {
     country,
     reference: uuidRef,
     description: params.description.slice(0, 160),
-    metadata: [
-      { casinoReference: params.reference },
-      ...(params.metadata || []).slice(0, 8),
-    ],
+    metadata: formatMarzPayMetadata(params.reference, params.metadata),
   };
   if (callbackUrl) {
     reqPayload.callback_url = callbackUrl;
@@ -276,7 +300,7 @@ export async function marzpaySendMoney(params: {
   phoneNumber: string;
   reference: string;
   description: string;
-  metadata?: Array<Record<string, string | number>>;
+  metadata?: Array<Record<string, string | number | boolean>>;
 }): Promise<MarzPayTransferResult> {
   const normalizedPhone = normalizeUgPhoneNumber(params.phoneNumber);
   const country = (process.env.MARZPAY_COUNTRY || 'UG').trim().toUpperCase() || 'UG';
@@ -289,10 +313,7 @@ export async function marzpaySendMoney(params: {
     country,
     reference: uuidRef,
     description: params.description.slice(0, 160),
-    metadata: [
-      { casinoReference: params.reference },
-      ...(params.metadata || []).slice(0, 8),
-    ],
+    metadata: formatMarzPayMetadata(params.reference, params.metadata),
   };
   if (callbackUrl) {
     reqPayload.callback_url = callbackUrl;

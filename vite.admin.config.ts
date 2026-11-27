@@ -44,6 +44,8 @@ export default defineConfig(() => {
             'marzpay.php',
             'casino_royale.sql',
             '.htaccess',
+            '.env.example',
+            'casinoug-secrets.example.php',
           ];
           for (const fileName of phpBackendFiles) {
             const srcFile = path.resolve(__dirname, fileName);

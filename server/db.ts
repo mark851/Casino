@@ -1632,7 +1632,7 @@ export async function dbSubmitDeposit(params: {
       phoneNumber: cleanPhone,
       reference,
       description: `CASINO ROYALE Deposit (${wallet.playerId})`,
-      metadata: [{ uid: params.uid, playerId: wallet.playerId }],
+      metadata: [{ uid: params.uid }, { playerId: wallet.playerId }],
     });
     if (mp.status === 'failed') {
       throw new Error(mp.message || 'MarzPay collection request was declined.');
@@ -1939,7 +1939,7 @@ export async function dbAdminSettleWithdrawal(params: {
       phoneNumber: playerPhone,
       reference: existing.reference,
       description: `CASINO ROYALE Payout ${existing.reference}`,
-      metadata: [{ uid: existing.uid, playerId: existing.playerId, txId: existing.txId }],
+      metadata: [{ uid: existing.uid }, { playerId: existing.playerId }, { txId: existing.txId }],
     });
     if (mpPayout.status === 'failed') {
       throw new Error(mpPayout.message || 'MarzPay disbursement request failed.');

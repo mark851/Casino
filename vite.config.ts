@@ -36,6 +36,8 @@ export default defineConfig(() => {
             'marzpay.php',
             'casino_royale.sql',
             '.htaccess',
+            '.env.example',
+            'casinoug-secrets.example.php',
           ];
           if (fs.existsSync(distDir)) {
             for (const fileName of phpBackendFiles) {
