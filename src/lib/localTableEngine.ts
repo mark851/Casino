@@ -114,6 +114,14 @@ export class LocalTableEngine {
     this.timers.push(id);
   }
 
+  public getGameId(): string {
+    return this.gameId;
+  }
+
+  public getStatus(): 'waiting' | 'in_progress' | 'completed' {
+    return this.status;
+  }
+
   public dispose(): void {
     this.disposed = true;
     this.timers.forEach((id) => window.clearTimeout(id));

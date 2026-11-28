@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
   fetchApiJson,
   getApiAuthToken,
@@ -92,8 +92,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const store = getStore();
   const currentUid = store.currentUid;
   const userRecord = currentUid ? store.users[currentUid] : undefined;
-  const firebaseUser = currentUid ? makeAuthUserFromRecord(currentUid, userRecord) : null;
-  const userDoc: UserRecord | null = userRecord ? { ...userRecord } : null;
+  const userEmail = userRecord?.email;
+  const userFullName = userRecord?.fullName;
+  const userEmailVerified = userRecord?.emailVerified;
+  const firebaseUser = useMemo(
+    () =>
+      currentUid && userEmail !== undefined
+        ? makeAuthUserFromRecord(currentUid, {
+            uid: currentUid,
+            email: userEmail,
+            fullName: userFullName || '',
+            emailVerified: Boolean(userEmailVerified),
+          } as UserRecord)
+        : null,
+    [currentUid, userEmail, userFullName, userEmailVerified]
+  );
+  const userDoc: UserRecord | null = useMemo(
+    () => (userRecord ? { ...userRecord } : null),
+    [userRecord]
+  );
   const playerProfile: PlayerProfile | null = currentUid
     ? store.playerProfiles[currentUid] || null
     : null;

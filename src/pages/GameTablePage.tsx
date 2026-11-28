@@ -65,6 +65,10 @@ export const GameTablePage: React.FC = () => {
   const { isFullscreen, toggleFullscreen } = useGameFullscreen(arenaContainerRef);
   const recordedWinGameIdRef = useRef<string | null>(null);
   const pendingPaidRematchRef = useRef<boolean>(false);
+  const pendingStartRef = useRef<{ entryFeeUgx: number } | null>(null);
+  const rulesRef = useRef(systemSettings.matatuRules);
+  rulesRef.current = systemSettings.matatuRules;
+  const myUid = firebaseUser?.uid || '';
   const prevTurnUidRef = useRef<string | null>(null);
   const prevStatusRef = useRef<string | null>(null);
   const prevLudoSignalRef = useRef<string>('');
@@ -129,7 +133,7 @@ export const GameTablePage: React.FC = () => {
   }, [gameState]);
 
   useEffect(() => {
-    if (!roomId || !firebaseUser) return;
+    if (!roomId || !myUid) return;
     let closed = false;
 
     void (async () => {
@@ -144,10 +148,10 @@ export const GameTablePage: React.FC = () => {
         mode: 'bot',
         maxPlayers: cfg?.maxPlayers || 2,
         entryFeeUgx: cfg?.entryFeeUgx || MIN_GAME_STAKE_UGX,
-        playerUid: firebaseUser.uid,
+        playerUid: myUid,
         playerId: profileIdentityRef.current.playerId,
         playerName: profileIdentityRef.current.displayName,
-        rules: systemSettings.matatuRules,
+        rules: rulesRef.current,
         startImmediately: Boolean(cfg?.tournamentId),
         tournamentId: cfg?.tournamentId,
         tournamentMatchId: cfg?.tournamentMatchId,
@@ -191,6 +195,18 @@ export const GameTablePage: React.FC = () => {
         },
       });
       localEngineRef.current = engine;
+      if (pendingStartRef.current) {
+        const pending = pendingStartRef.current;
+        pendingStartRef.current = null;
+        const key = `${roomId}:${engine.getGameId()}`;
+        setStakedKeys((prev) => ({ ...prev, [key]: true }));
+        try {
+          window.sessionStorage.setItem(`casino_royale_staked_${key}`, '1');
+        } catch {
+          // Ignore storage errors
+        }
+        engine.handleCommand({ type: 'START_GAME', entryFeeUgx: pending.entryFeeUgx });
+      }
     })();
 
     return () => {
@@ -202,7 +218,7 @@ export const GameTablePage: React.FC = () => {
         localEngineRef.current = null;
       }
     };
-  }, [roomId, firebaseUser, systemSettings.matatuRules]);
+  }, [roomId, myUid]);
 
   // Audio feedback on state transitions
   useEffect(() => {
@@ -366,7 +382,6 @@ export const GameTablePage: React.FC = () => {
     }
   };
 
-  const myUid = firebaseUser?.uid || '';
   const availableBalance = Number(wallet?.availableBalance ?? 0);
   const isHost = gameState?.hostUid === myUid;
   const matchStakeKey = gameState ? `${gameState.roomId}:${gameState.gameId}` : '';
@@ -435,10 +450,19 @@ export const GameTablePage: React.FC = () => {
         amountUgx: amountToPay,
         gameLabel: `${gameState.roomName} (${gameState.gameType || 'matatu'})`,
       });
-      markMatchStaked(`${gameState.roomId}:${gameState.gameId}`);
-      soundFx.play('match');
-      if (gameState.status === 'waiting') {
-        sendCommand({ type: 'START_GAME', entryFeeUgx: amountToPay });
+      const activeEngine = localEngineRef.current;
+      if (activeEngine) {
+        const liveGameId = activeEngine.getGameId();
+        markMatchStaked(`${gameState.roomId}:${liveGameId}`);
+        if (liveGameId !== gameState.gameId) {
+          markMatchStaked(`${gameState.roomId}:${gameState.gameId}`);
+        }
+        soundFx.play('match');
+        activeEngine.handleCommand({ type: 'START_GAME', entryFeeUgx: amountToPay });
+      } else {
+        pendingStartRef.current = { entryFeeUgx: amountToPay };
+        markMatchStaked(`${gameState.roomId}:${gameState.gameId}`);
+        soundFx.play('match');
       }
     } catch (err) {
       setStakeError(extractWalletErrorMessage(err, 'Unable to lock table stake.'));

@@ -731,7 +731,7 @@ export const ThreeChessBoard: React.FC<ThreeChessBoardProps> = ({
 
   useEffect(() => {
     sceneSyncRef.current?.();
-  }, [board, selected, legalTargets, lastMove, inCheckColor]);
+  }, [board, selected, legalTargets, lastMove, inCheckColor, isYourTurn, gameStatus]);
 
   useEffect(() => {
     const sideSign = orientBlack ? -1 : 1;
